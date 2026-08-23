@@ -1,5 +1,36 @@
 # CHANGELOG — 武神传说扩展 v26.1.x
 
+## 26.3.10（2026-08-23）
+- 🔒 **配置上传/下载安全修复**（`wg-auto.js`）：
+  - 上传 `make_config`：由 `key.indexOf(rid)` 子串匹配改为 `_isKeyOfRole` 精确判定（`rid@`/`rid_`/`rid-` 前缀
+    及 `flow_store@rid`/`global_params@rid`/`###CodeTranslator@rid`），不再因角色ID是子串而误把其他账号配置传上去
+  - 下载 `load_config`：写回前用 `_isRoleKey && !_isKeyOfRole(key, rid)` 过滤，非当前角色的专属键一律跳过
+  - **排除登录器账号密码库**：新增 `_isSensitiveLsKey`（cookie/session/`mud_game_account_data`/`login_name`），
+    上传的 `__LS__` 打包、下载的 `__LS__` 写回两端都过滤——彻底杜绝可还原账号密码上传/还原
+  - 移除失效的"清空云端"功能（服务器 `/User/Backup` 不支持覆盖，属无用按钮，已连同 `clear_config`/`clearbak` 清理）
+- 🗑 **一键登录器新增「删除账号」**（`wslogin.js`）：选中账号 → 删除该账号下所有区服所有角色的全部配置
+  （自命令/触发器/流程/持久变量/角色设置/游戏设置）、并移除账号库记录（`clear_role_data` 支持 silent 批量）
+- 🎨 **触发器分隔符提示统一 + 「时辰已到」变量改英文**（`Trigger.js`）：
+  - 所有触发器的填充提示统一为 `⚠ 填写提示：…`：多选枚举用单个 `|`，关键字/逻辑用 `||` 或/`&&` 且/`()` 括号
+  - 「时辰已到」时/分/秒字段名由中文改 `hour/minute/second`（面板仍显示中文），消除中文变量名隐患
+- ⚡ **Raid 新增 `@eventsall` 命令**（`Raid.js`）：同一 `dialog:events` 回包内支持 `|` 分隔的多个独立匹配分支，
+  **每个分支各自对全部事件条目扫描并捕获变量、互不干扰**，一次可提取多个不同活动的数值
+  （原 `@events` 遇第一条命中即 break，只能取一个）；`@events` 命令匹配改为精确（避免拦截 `@eventsall`）
+
+## 26.3.9（2026-08-23）
+- 🐛 **修复多开账号相互顶号后无法自动抢回**（`websocket-proxy.js`/`wslogin.js`）：
+  - **顶号抢回机制按 roleid 隔离**：短冷却键、目标角色键由全局共享改为按角色独立，解决"两账号互切顶号时互相干扰"
+    （顶 A 记的冷却挡住 B、目标键互写覆盖导致跳号）；并修正 `ext_this_window_role` 写 `sessionStorage`/读
+    `localStorage` 的不一致（读不到导致抢回目标失效）
+  - **移除顶号抢回的 24h 次数上限**（应要求），仅保留 30 秒短冷却防止当刻双端瞬间互相挤下线死循环
+  - **根治卡死在角色/区服选择界面**：`ensureLoginScreen` 由"点一次按钮 + 硬等面板"改为"循环逐步退回登录
+    界面，最多 12 秒，全程不抛错"；`handleAutoLogin` 中区服/角色面板改用新增的 `waitForElementVisibleSoft`
+    （超时不中断流程，交给 `selectServerByName`/`selectRoleById` 自带轮询+校验兜底）
+    —— 解决自动重登时 `操作超时: 等待 #slist_panel 失败` 导致的登录中断、角色属性为 0 卡住问题
+- ⚡ **「时辰已到」触发器支持"任意/多选"自由输入**（`Trigger.js`）：时/分/秒由下拉框改为文本输入框，
+  填单个数字精确匹配、`1|2|3` 多选、留空或 `*` 表示任意。例：分=0、秒=0、时留空 → **每个整点触发**，
+  无需再建 24 个触发器
+
 ## 26.3.8（2026-08-22）
 - 🐛 **修复 `@events` 反向捕获失效、匹配不到不置 null**（`Raid.js`）：原用 `AtCmdExecutor` 会在执行前
   `CmdPrehandleCenter` 把 `($BossName)` 提前替换成变量当前值，反向捕获占位符被吞掉 → 匹配命中也取不到值，

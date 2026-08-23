@@ -527,6 +527,20 @@ Object.assign(WG, {
 
           WG.run_hook(data.type, data);
 
+          // 【2026-08-22 修复】被其他设备登录踢下线：服务器返回 loginerror（"登陆凭证和角色不一致"）。
+          // 此时 socket 虽连上但凭证已作废，重连/刷新都不能自动恢复 → 收到即触发自动刷新重登抢回账号。
+          if (data.type == 'loginerror') {
+              var _lerr = (data && (data.msg || '')) + '';
+              if (_lerr.indexOf('凭证') >= 0 || _lerr.indexOf('不一致') >= 0) {
+                  try {
+                      if (typeof __extForceRelogin === 'function') {
+                          try { ExtLog.warn('[恢复] 检测到账号在其他设备登录，自动刷新重新登录抢回'); } catch (e2) { }
+                          __extForceRelogin((typeof roleid !== 'undefined') ? roleid : undefined);   // 传入被顶的事件角色，抢回时不跳号
+                      }
+                  } catch (e) { }
+              }
+          }
+
           // 【2026-08-12 移植作者 f45137e】合并"你获得了"物品消息（扫荡副本时大量重复提示聚合为一条）
           if (data.type == 'text' && typeof data.msg == 'string' &&
               data.msg.indexOf('你获得了') === 0 &&

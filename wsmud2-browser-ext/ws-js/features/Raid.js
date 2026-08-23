@@ -3533,7 +3533,8 @@
             return param;
         };
         const executor = new CmdExecutor(function (cmd) {
-            return cmd.indexOf("@events") == 0;
+            // 【2026-08-23】精确匹配 @events（需带参数或完全相等），避免拦截 @eventsall 命令
+            return cmd === "@events" || /^@events\s/.test(cmd);
         }, function (performer, cmd) {
             const matched = /@events\s+(.*)$/.exec(cmd);
             const param = matched ? matched[1] : "";
@@ -3604,6 +3605,112 @@
                 });
                 WG.Send("events");   // 向服务器请求事件列表
                 timeoutTimer = setTimeout(finish, 3000);   // 3 秒兜底（服务器没回包也不卡流程）
+            });
+        }, CmdExecutorPriority.ordinary);
+        CmdExecuteCenter.addExecutor(executor);
+    })();
+    (function () {
+        // 【2026-08-23 新增】@eventsall：与 @events 一样等服务器 dialog:events 回包，但同一回包内
+        // 支持按 `|` 分隔的多个独立匹配分支，每个分支各自对全部事件条目扫描并捕获变量，互不干扰。
+        // 适用场景：同一次回包里包含多条不同活动（如"挖矿效率+($wkzn)。|采药获得的经验+($cyzn)。"），
+        // 希望一次性把多个变量都提取到（原 @events 遇到第一条命中即 break，只能取到一个）。
+        // smartReplace 与 @events 同逻辑（该 IIFE 局部变量，此处复制一份供本命令使用）
+        const smartReplace = function (performer, param) {
+            var tokens = [];
+            param = param.replace(/\(\$[a-zA-Z0-9_]+?\)/g, function (s) {
+                return "\u0001" + (tokens.push(s) - 1) + "\u0001";
+            });
+            param = CmdPrehandleCenter.shared().handle(performer, param);
+            for (let i = 0; i < tokens.length; i++) {
+                param = param.replace("\u0001" + i + "\u0001", tokens[i]);
+            }
+            return param;
+        };
+        const executor = new CmdExecutor(function (cmd) {
+            return cmd.indexOf("@eventsall") == 0;
+        }, function (performer, cmd) {
+            const matched = /@eventsall\s+(.*)$/.exec(cmd);
+            const param = matched ? matched[1] : "";
+            return new Promise(function (resolve) {
+                var finished = false;
+                var timeoutTimer = null;
+                var hookId = null;
+                var finish = function () {
+                    if (finished) return;
+                    finished = true;
+                    if (timeoutTimer) clearTimeout(timeoutTimer);
+                    if (hookId != null) {
+                        try { WG.remove_hook(hookId); } catch (e) { }
+                    }
+                    resolve();
+                };
+                hookId = WG.add_hook("dialog", function (data) {
+                    if (finished) return;
+                    if (data.dialog == null || data.dialog != "events" || data.items == null) return;
+                    if (param != null) {
+                        let list = [];
+                        for (const item of data.items) {
+                            if (item.length > 2) {
+                                list.push(item[1] + " " + item[2]);
+                            }
+                        }
+                        // 智能替换：保留 ($Var) 用于反向捕获，其余做变量替换
+                        const text = smartReplace(performer, param);
+                        // 收集本命令所有反捕获占位符（整轮全部未匹配时置 null 用）
+                        let allPlaceholders = [];
+                        let ptt = /\(\$[a-zA-Z0-9_]+?\)/g;
+                        let rr = ptt.exec(text);
+                        while (rr != null) {
+                            allPlaceholders.push(rr[0]);
+                            rr = ptt.exec(text);
+                        }
+                        const allCaptureKeys = allPlaceholders.map(p => p.substring(2, p.length - 1));
+                        // 按 | 拆成多个独立分支，各自扫描全部条目捕获
+                        const segments = String(text).split("|");
+                        const hitKeys = {};
+                        for (const seg of segments) {
+                            if (!seg) continue;
+                            // 该分支占位符 → 替换为正则捕获组
+                            let segPlaceholders = [];
+                            let sp = /\(\$[a-zA-Z0-9_]+?\)/g;
+                            let sr = sp.exec(seg);
+                            while (sr != null) {
+                                segPlaceholders.push(sr[0]);
+                                sr = sp.exec(seg);
+                            }
+                            let segRegex = seg;
+                            for (let i = 0; i < segPlaceholders.length; i++) {
+                                segRegex = segRegex.replace(segPlaceholders[i], "(.+?)");
+                            }
+                            try {
+                                let sreg = new RegExp(segRegex);
+                                for (const t of list) {
+                                    let m3 = sreg.exec(t);
+                                    if (m3 != null) {
+                                        for (let j = 0; j < segPlaceholders.length; j++) {
+                                            let key = segPlaceholders[j].substring(2, segPlaceholders[j].length - 1);
+                                            let value = m3[j + 1];
+                                            if (value != null) {
+                                                UpdateVariable(performer, key, value);
+                                                hitKeys[key] = true;
+                                            }
+                                        }
+                                        break;   // 该分支命中即停，去处理下一分支
+                                    }
+                                }
+                            } catch (e) { }
+                        }
+                        // 整轮（所有分支）都未捕获到的反捕获变量 → 置 null
+                        for (const key of allCaptureKeys) {
+                            if (!hitKeys[key]) {
+                                UpdateVariable(performer, key, null);
+                            }
+                        }
+                    }
+                    finish();
+                });
+                WG.Send("events");   // 请求事件列表
+                timeoutTimer = setTimeout(finish, 3000);
             });
         }, CmdExecutorPriority.ordinary);
         CmdExecuteCenter.addExecutor(executor);

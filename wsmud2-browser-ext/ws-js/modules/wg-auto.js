@@ -563,6 +563,54 @@ Object.assign(WG, {
           
           messageAppend("<hig>自定义监控已重新注入。", 1);
       },
+      // 【2026-08-23 安全修复】判断 GM 键是否属于指定角色 rid。
+      // 之前在 make_config 用 key.indexOf(rid)>=0 做子串匹配，ID 短的账号（如 1/10/abc 等子串）
+      // 会误匹配到其他角色的键 → 上传了别人的账号配置；下载时又全量写回，造成跨账号泄露。
+      // 现改为"前缀 + 边界符"精确判定（角色ID可能是纯数字如 123，也可能是字母数字混合
+      // 如 hn7c10b71717，故不能硬编码 \d）：
+      //   键 == rid 本身，或键以 rid@ / rid_ / rid- 开头，或精确命中 flow_store@{rid} /
+      //   global_params@{rid} / ###CodeTranslator@{rid}
+      _isKeyOfRole: function (key, rid) {
+          if (typeof key !== 'string' || !key || !rid) return false;
+          rid = String(rid);
+          if (key === rid) return true;
+          if (key.indexOf(rid + "@") === 0) return true;
+          if (key.indexOf(rid + "_") === 0) return true;
+          if (key.indexOf(rid + "-") === 0) return true;
+          if (key === "flow_store@" + rid) return true;
+          if (key === "global_params@" + rid) return true;
+          if (key === "###CodeTranslator@" + rid) return true;
+          return false;
+      },
+      // 【2026-08-23】判断某键是否是"某个角色的专属键"（不关心是哪个角色）。
+      // 角色ID可能是纯数字或多位字母数字混合（如 hn7c10b71717）。判定依据键前缀边界符：
+      //  - 不以 _ 开头（排除 _shieldswitch / _pushSwitch 这类全局或别名键）、不含 __LS__
+      //  - 命中 <text>@ 或 <text>_ 前缀，或精确匹配 flow_store@ / global_params@ / ###CodeTranslator@
+      // 下载时对这类键做"只属于当前角色才写回"过滤，避免其他账号角色键被覆盖回来。
+      _isRoleKey: function (key) {
+          if (typeof key !== 'string' || !key) return false;
+          if (key.charAt(0) === '_') return false;                  // 下划线开头 = 全局/别名，非角色键
+          if (key.charAt(0) === '@') return false;
+          if (/^.+@/.test(key)) return true;                       // xxx@（如 hn7c10b71717@triggers）
+          if (/^.+_/.test(key)) return true;                       // xxx_（如 123_pushSwitch）
+          if (key.indexOf("flow_store@") === 0) return true;
+          if (key.indexOf("global_params@") === 0) return true;
+          if (key.indexOf("###CodeTranslator@") === 0) return true;
+          return false;
+      },
+      // 【2026-08-23 安全修复】判断 localStorage 键是否敏感（不该参与上传/下载）：
+      //  - cookie / session（会话凭证）
+      //  - 一键登录账号密码库（mud_game_account_data，含可还原编码的密码）
+      //  - 其它已知敏感项（上次登录名等）
+      _isSensitiveLsKey: function (key) {
+          if (typeof key !== 'string' || !key) return true;
+          var lower = key.toLowerCase();
+          if (lower.indexOf("cookie") >= 0) return true;
+          if (lower.indexOf("session") >= 0) return true;
+          if (key.indexOf("mud_game_account_data") >= 0) return true;   // 账号+密码库
+          if (key.indexOf("login_name") === 0) return true;              // 补充：上次登录名
+          return false;
+      },
       make_config: async function () {
           // 【2026-08-09 移植v1.0.0】上传配置：当前角色 GM 配置 + 全局设置 + 游戏自带 localStorage 设置（__LS__ 前缀）
           // 【2026-08-11 修复】角色 ID 优先用页面全局 Role.id（登录 DOM 读取的 roleid 可能失效 → indexOf 匹配不到 → 角色设置键漏传）
@@ -574,7 +622,10 @@ Object.assign(WG, {
           let _config = {};
           let keys = GM_listValues();
           keys.forEach(key => {
-              if (key.indexOf(rid) >= 0) {
+              // 【2026-08-23 安全修复】改为精确判定当前角色专属键：不再用 key.indexOf(rid)>=0 子串匹配
+              // （子串匹配会把 ID 是当前角色子串的其他账号键也收进来 → 泄露他人配置）
+              // 注意：jQuery 绑定下 this 不是 WG 对象，用外层 WG 引用
+              if (WG._isKeyOfRole(key, rid)) {
                   _config[key] = GM_getValue(key);
               }
           });
@@ -601,13 +652,13 @@ Object.assign(WG, {
               var gpVal = GM_getValue(gparamKey, null);
               if (gpVal != null) _config[gparamKey] = gpVal;
           } catch (e) { }
-          // 附带游戏自带的 localStorage 设置（含游戏自带拓展设置，排除 cookie/session 敏感项）
+          // 【2026-08-23 安全修复】附带的游戏 localStorage 设置（含游戏自带拓展设置）。
+          // 排除 cookie/session 及"一键登录账号密码库"等敏感键——绝不把可还原密码的账号库上传。
           try {
               for (var li = 0; li < window.localStorage.length; li++) {
                   var lsKey = window.localStorage.key(li);
-                  if (lsKey && lsKey.indexOf("cookie") < 0 && lsKey.indexOf("session") < 0) {
-                      _config["__LS__" + lsKey] = window.localStorage.getItem(lsKey);
-                  }
+                  if (lsKey && WG._isSensitiveLsKey(lsKey)) continue;   // cookie/session/账号库等一律跳过
+                  _config["__LS__" + lsKey] = window.localStorage.getItem(lsKey);
               }
           } catch (e) { }
           console.log(_config)
@@ -690,6 +741,9 @@ Object.assign(WG, {
       },
       load_config: async function () {
           // 【2026-08-09 移植v1.0.0】下载配置：支持把 __LS__ 前缀项写回游戏 localStorage
+          // 【2026-08-23 安全修复】写回前校验：只写回当前角色的专属键 + 非角色专属键，
+          // 跳过"属于其他角色 ID"的键——防止在别人账号登录后下载到该账号的多角色配置。
+          var rid = (unsafeWindow && unsafeWindow.Role && unsafeWindow.Role.id) || roleid;
           SettingsStore.getUserConfig(GameState.id, (res) => {
               if (res != "") {
                   // 【2026-08-11 容错】res 可能是对象（jQuery 已解析）或字符串
@@ -701,11 +755,18 @@ Object.assign(WG, {
                       return;
                   }
                   for (const key in _config) {
+                      // 【2026-08-23 安全修复】__LS__ 写回前过滤敏感键（cookie/session/账号密码库），
+                      // 即使云端残留这类数据也不写入本地，杜绝登录器账号密码被还原
                       if (key.indexOf("__LS__") === 0) {
-                          try { window.localStorage.setItem(key.substring(6), _config[key]); } catch (e) { }
-                      } else {
-                          GM_setValue(key, _config[key]);
+                          var lsRawKey = key.substring(6);
+                          if (WG._isSensitiveLsKey(lsRawKey)) continue;
+                          try { window.localStorage.setItem(lsRawKey, _config[key]); } catch (e) { }
+                          continue;
                       }
+                      // 【2026-08-23 安全修复】属于某角色的专属键：仅当属于当前角色时才写回，否则跳过
+                      // （防止其他账号的 {id}@xxx / {id}_xxx / flow_store@{id} 等被下载覆盖回当前账号）
+                      if (WG._isRoleKey(key) && !WG._isKeyOfRole(key, rid)) continue;
+                      GM_setValue(key, _config[key]);
                   }
                   // 【2026-08-09 修复】下载后刷新触发器内存缓存（Raid 流程 FlowStore 每次动态读 GM，无需刷新）
                   try {
@@ -713,7 +774,6 @@ Object.assign(WG, {
                           unsafeWindow.TriggerCenter.reload();
                       }
                   } catch (e) { }
-
 
                   GlobalInit.configInit();
 
@@ -725,6 +785,61 @@ Object.assign(WG, {
               }
           });
       }, //设置
+      // 【2026-08-23 本地清理】清除本地的"一键登录账号密码库"及登录残留。
+      // 目的：本机/别人拿到扩展存储时，不会有可还原的账号密码可被读取/上传。
+      // 只删本地 localStorage 的登录器账号数据，不影响游戏内角色配置、触发器、流程。
+      clear_local_login: function () {
+          if (!confirm("确定清除本地的【一键登录账号密码库】吗？\n将删除本机保存的所有用于一键登录的账号和密码（mud_game_account_data）、上次登录名。\n之后一键登录弹窗需重新手动添加账号。\n继续？")) return;
+          var removed = [];
+          var removedNote = "";
+          try {
+              var data = localStorage.getItem("mud_game_account_data");
+              if (data) { localStorage.removeItem("mud_game_account_data"); removed.push("账号密码库"); removedNote += ("（含 " + Object.keys(JSON.parse(data)).length + " 个账号）"); }
+          } catch (e) { }
+          try {
+              if (localStorage.getItem("login_name") != null) { localStorage.removeItem("login_name"); removed.push("上次登录名"); }
+          } catch (e) { }
+          if (removed.length > 0) {
+              LayerHelper.msg("已清除本地登录信息：" + removed.join("、") + removedNote + "，刷新后生效");
+          } else {
+              LayerHelper.msg("本地没有可清除的登录账号数据");
+          }
+      },
+      // 【2026-08-23 彻底清理】删除指定角色的全部配置数据：角色设置、自命令、监控、触发器、流程、持久变量，
+      // 以及 localStorage 中该角色的游戏设置。只针对目标角色，不影响其他角色/账号。
+      // roleId：可选。传入则删除该指定角色；不传则删除当前登录角色。
+      // silent：true 时跳过确认弹窗（供"删除整个账号"批量调用，避免每个角色都弹一次）。
+      clear_role_data: function (roleId, silent) {
+          var rid = roleId || (unsafeWindow && unsafeWindow.Role && unsafeWindow.Role.id) || roleid;
+          if (!rid) { LayerHelper.msg("未获取到角色ID，无法删除"); return; }
+          if (!silent) {
+              if (!confirm("确定彻底删除角色 [" + rid + "] 的全部配置数据吗？\n将删除该角色的：自命令、自定义监控、触发器、Raid流程、持久变量、角色设置、游戏设置。\n此操作不可恢复。\n仅针对该角色，不影响其他账号。\n继续？")) return;
+          }
+          var gmDel = 0, gmReserve = 0;
+          // 1) GM 键：删除当前角色专属的所有键（{rid}@ / {rid}_ / flow_store@{rid} / global_params@{rid} / ###CodeTranslator@{rid}）
+          var keys = GM_listValues();
+          keys.forEach(function (key) {
+              if (!WG._isKeyOfRole(key, rid)) return;
+              try { GM_deleteValue(key); gmDel++; } catch (e) { gmReserve++; }
+          });
+          // 2) localStorage 游戏设置：删除该角色相关键（key 以 rid@/rid_ 开头，或 __LS__ 前缀对应项）
+          //    仅删除明显属于本角色的游戏本地键，绝不动 mud_game_account_data 等登录敏感键
+          var lsDel = 0;
+          try {
+              for (var li = localStorage.length - 1; li >= 0; li--) {
+                  var lk = localStorage.key(li);
+                  if (!lk) continue;
+                  if (WG._isSensitiveLsKey(lk)) continue;          // 跳过 cookie/session/账号库
+                  var raw = lk;
+                  if (raw.indexOf("__LS__") === 0) raw = raw.substring(6);
+                  if (WG._isKeyOfRole(raw, rid)) { try { localStorage.removeItem(lk); lsDel++; } catch (e) { } }
+              }
+          } catch (e) { }
+          // 3) 刷新内存配置
+          try { GlobalInit.configInit(); } catch (e) { }
+          try { if (unsafeWindow && unsafeWindow.TriggerCenter && unsafeWindow.TriggerCenter.reload) unsafeWindow.TriggerCenter.reload(); } catch (e) { }
+          LayerHelper.msg("已删除当前角色配置（GM " + gmDel + " 项，localStorage " + lsDel + " 项，保留 " + gmReserve + " 项），重新登录后完全生效");
+      },
       reset_default: function () {
           // 【2026-08-09 移植v1.0.0】恢复默认：仅重置当前角色设置，保留自命令/自定义监控/Raid流程/触发器
           if (!confirm("确定恢复当前角色的所有设置到默认值？\n此操作不会删除自命令、触发器和Raid流程。")) return;

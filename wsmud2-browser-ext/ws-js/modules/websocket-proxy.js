@@ -59,6 +59,95 @@ if (WebSocket) {
         } catch (e) { }
     }
 
+    // 【2026-08-22 修复】对外暴露强制自动重登入口：供收包口在检测到"被其他设备登录踢下线
+    // （服务器返回 loginerror 凭证失效）"时调用，立即走"刷新页面 + 一键登录自动重登"抢回账号。
+    // 被顶属于"账号被别处占用"，必须尽快抢回，因此【跳过普通 10 分钟重连冷却】。
+    // 【2026-08-23 隔离修复】之前冷却/目标键均为全局共享，两账号互相顶号时互相干扰
+    // （顶A记的冷却挡住B、目标键互写覆盖→跳号）。现全部【按 roleid 隔离】：
+    //   - 短冷却带 roleid 后缀：顶A只约束A，不挡B
+    //   - 本窗口角色用 sessionStorage（每标签独立、刷新保留），不再用共享 localStorage
+    // 【2026-08-23 上限移除】应要求去掉 24h 次数硬上限，顶号抢回不再受限，仅保留 30s 短冷却，
+    // 避免当刻双端瞬间互相挤下线死循环。
+    var _kcTimeKey = 'ext_kick_recover_ts';
+    var _kickTargetKey = 'ext_kick_recover_role';   // 被顶前的事件角色，刷新后据此抢回（按角色隔离）
+    function _forceRelogin(targetRoleId) {
+        try {
+            if (typeof auto_recover === 'undefined' || (auto_recover !== '开' && auto_recover !== true && auto_recover !== 'true')) return;
+            var now = Date.now();
+            // 本窗口登录角色：优先 loginerror 传入 → 本窗口角色(sessionStorage,每标签独立) → 记录的踢号键 → 当前 roleid
+            var rid = targetRoleId;
+            if (!rid) {
+                try { rid = sessionStorage.getItem('ext_this_window_role') || ''; } catch (e) { rid = ''; }
+            }
+            if (!rid) rid = localStorage.getItem(_kickTargetKey) || '';
+            if (!rid) rid = (typeof roleid !== 'undefined' ? roleid : '') || '';
+            if (!rid) return;
+            // 记录抢回目标角色（按角色隔离，A/B互不覆盖）
+            localStorage.setItem(_kickTargetKey, String(rid));
+            // 短冷却：30 秒内只抢一次（键按角色隔离，避免另一账号互挡）
+            var kcTime = _kcTimeKey + '_' + rid;
+            var lastKick = parseInt(localStorage.getItem(kcTime) || '0', 10);
+            if (now - lastKick < 30000) return;
+            localStorage.setItem(kcTime, String(now));
+            localStorage.setItem(_recoverFlagKey, '1');   // 登录器读到此标记后自动重登
+            try { ExtLog.warn('[恢复] 检测到账号被其他设备登录(顶号)，自动刷新重新登录抢回 ' + rid); } catch (e) { }
+            location.reload();
+        } catch (e) { }
+    }
+    unsafeWindow.__extForceRelogin = function (targetRoleId) {
+        try { _forceRelogin(targetRoleId); } catch (e) { }
+    };
+
+    // 【2026-08-22 修复】记录"当前在线角色"为潜在的抢回目标。被顶常表现为 socket 直接 close
+    // （不产生 loginerror），此记录让 loginerror 或后续抢回能定位真正的被顶角色，避免跳号到别处。
+    unsafeWindow.__extRecordKickRole = function () {
+        try {
+            var rid = (typeof roleid !== 'undefined' && roleid) ? String(roleid) : '';
+            if (!rid) {
+                // roleid 已被清时，回退到 Process.player（游戏会话角色）
+                try { if (typeof Process !== 'undefined' && Process.player) rid = String(Process.player); } catch (e) { }
+            }
+            if (rid) localStorage.setItem(_kickTargetKey, String(rid));
+        } catch (e) { }
+    };
+
+    // 【2026-08-22 跨窗口在线心跳】多开多账号同时挂在多个 Chrome 窗口时，供每个窗口都能
+    // 汇总看到"所有在线的角色"，用于排查/协调顶号重连。同 origin 的多窗口共享 localStorage：
+    // 每个在线窗口循环把自己的 roleid 在线状态写入 ext_live_roles（带时间戳），任意窗口读它即可
+    // 看到全部在线角色。心跳 2s 一次，成本极低；只写状态、不干扰任何游戏逻辑。
+    var _hbKey = 'ext_live_roles';
+    var _hbTimer = null;
+    function _heartbeatWrite() {
+        try {
+            var map = {};
+            try { map = JSON.parse(localStorage.getItem(_hbKey) || '{}') || {}; } catch (e) { map = {}; }
+            // 清理 >10s 未心跳的旧角色（别窗口掉线/关闭后自然过期）
+            var now = Date.now();
+            for (var k in map) {
+                if (map.hasOwnProperty(k) && now - (map[k].ts || 0) > 10000) delete map[k];
+            }
+            var rid = (typeof roleid !== 'undefined') ? String(roleid) : '';
+            if (rid) {
+                map[rid] = { ts: now, online: !!(GameState && GameState.connected), ws: ws ? ws.readyState : -1 };
+                // 【2026-08-22 修复】持续记录"本窗口登录角色"。用 sessionStorage（每标签独立，
+                // 多窗口共享 localStorage 会互相覆盖）——被顶时优先用它作抢回目标。
+                try { sessionStorage.setItem('ext_this_window_role', rid); } catch (e) { }
+            }
+            localStorage.setItem(_hbKey, JSON.stringify(map));
+        } catch (e) { }
+    }
+    function _heartbeatStart() {
+        if (_hbTimer) return;
+        _heartbeatWrite();
+        _hbTimer = setInterval(_heartbeatWrite, 2000);
+    }
+    function _heartbeatStop() {
+        if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null; }
+    }
+    // 登录后启动心跳；断线停止（让该角色在汇总里自然过期）
+    unsafeWindow.__extHeartbeatStart = _heartbeatStart;
+    unsafeWindow.__extHeartbeatStop = _heartbeatStop;
+
     function _scheduleRelogin() {
         clearTimeout(_reloginTimer);
         if (GameState.connected) { _reloginTry = 0; return; }        // 已连上 → 停止并复位
@@ -72,7 +161,10 @@ if (WebSocket) {
         var idx = Math.min(_reloginTry, _reloginDelay.length - 1);
         _reloginTimer = setTimeout(function () {
             if (GameState.connected) { _reloginTry = 0; return; }
-            try { KEY.do_command("score"); } catch (e) { }            // 模拟点"刷新状态"触发重连
+            // 【2026-08-22 修复】断线重连不再点击 score 按钮（toggle 面板导致 SendCommand 触发不稳定、
+            // 面板打开时点击只会关闭面板不发命令，重连迟迟不触发）。
+            // 改为直接调用 SendCommand("score")：断线时它内部自动走 ConnectServer 重连，稳定可靠。
+            try { SendCommand("score"); } catch (e) { }
             _reloginTry++;
             _scheduleRelogin();                                       // 递归安排下一次（间隔递增）
         }, _reloginDelay[idx]);
@@ -103,7 +195,17 @@ if (WebSocket) {
         get binaryType() { return (this._ws || ws).binaryType; },
         set binaryType(t) { (this._ws || ws).binaryType = t; },
         get onopen() { return (this._ws || ws).onopen; },
-        set onopen(fn) { (this._ws || ws).onopen = fn; },
+        set onopen(fn) {
+            // 【2026-08-22 修复】断线重连走的是"续连"：服务端通常不再重新下发 login 消息，
+            // 导致 GameState.connected 永远卡在 false（_scheduleRelogin 误判未连上、持续重试）。
+            // 在真实连接打开(onopen)时，把 connected/online 恢复为 true，解除此卡死。
+            (this._ws || ws).onopen = (e) => {
+                if (GameState) { GameState.connected = true; }
+                if (WG) { WG.online = true; }
+                try { _heartbeatStart(); } catch (eh) { }   // 连上 → 启动跨窗口心跳
+                if (typeof fn === "function") fn(e);
+            };
+        },
 
         // ★ 关键点①：游戏给 WebSocket 设置"收到消息"处理函数时
         //   我们把它偷偷换成 WG.receive_message，让插件先看消息
@@ -122,6 +224,9 @@ if (WebSocket) {
                 var wasConnected = GameState.connected;      // 断线前的状态（区分真断线 vs 重连失败）
                 WG.online = false;                           // 标记：离线了
                 GameState.connected = false;
+                try { _heartbeatStop(); } catch (eh) { }     // 断开 → 停止心跳，该角色在汇总里自然过期
+                // 【2026-08-22 修复】被顶前先记录当前角色，供后续抢回定位（避免跳号到别处）
+                try { if (typeof unsafeWindow.__extRecordKickRole === 'function') unsafeWindow.__extRecordKickRole(); } catch (eh2) { }
                 auto_relogin = GM_getValue(roleid + "_auto_relogin", auto_relogin);  // 读自动重连设置
                 if (typeof fn === "function") fn(e);   // 先执行游戏自己的关闭处理
                 if (auto_relogin == "开" || auto_relogin === true || auto_relogin === 'true') {      // 开了自动重连 → 退避重试

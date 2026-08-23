@@ -102,6 +102,11 @@
                                 <span class="glyphicon glyphicon-flash"></span>
                                 <span style="margin-left:0.5rem">立即登录</span>
                             </div>
+                            <!-- 【2026-08-23 登录器清理】删除账号（连同其下所有角色配置） -->
+                            <div id="wsmud-login-clear-account" class="wsmud-login-clear-account">
+                                <span class="glyphicon glyphicon-remove"></span>
+                                <span>删除账号</span>
+                            </div>
                             <!-- 新增版本标识，提升辨识度 -->
                             <div class="wsmud-login-version">v4.2</div>
                         </div>
@@ -214,6 +219,21 @@
                     text-align: center;
                 }
 
+                /* 【2026-08-23 登录器清理】删除账号按钮：红色、次一级，避免误点主登录 */
+                .wsmud-login-clear-account {
+                    color: #f87171; border: 1px solid #dc2626;
+                    text-align: center; padding: 7px 8px; border-radius: 8px;
+                    cursor: pointer; font-size: 13px; margin-top: 8px;
+                    transition: all 0.2s ease;
+                    display: flex; justify-content: center; align-items: center; gap: 4px;
+                }
+                .wsmud-login-clear-account:hover {
+                    background: rgba(220, 38, 38, 0.12);
+                }
+                .wsmud-login-clear-account:active {
+                    transform: scale(0.97);
+                }
+
                 /* 注入按钮优化：与游戏原有面板样式统一，增加hover高亮 */
                 /*.panel_item[command="ShowLoginDialog"] {
                     transition: background-color 0.2s ease, color 0.2s ease;
@@ -275,6 +295,58 @@
             $("#wsmud-login-accounts").on("change", (e) => this.handleAccountChange(e));
             $("#wsmud-login-servers").on("change", (e) => this.handleServerChange(e));
             $("#wsmud-login-btn").on("click", () => this.handleAutoLogin());
+
+            // 【2026-08-23 登录器清理】删除整个账号：删除该账号下所有角色配置 + 从账号库移除记录
+            $("#wsmud-login-clear-account").on("click", () => {
+                const account = $("#wsmud-login-accounts").val();
+                if (!account) {
+                    alert("请先在右侧选择要删除的账号");
+                    return;
+                }
+                // 收集该账号下所有区服的所有角色ID
+                const roleIds = [];
+                try {
+                    const raw = localStorage.getItem("mud_game_account_data");
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        const accInfo = data[account];
+                        if (accInfo) {
+                            for (const sv in accInfo) {
+                                if (sv === "password") continue;
+                                const info = accInfo[sv];
+                                const roles = (info && info.roles) || [];
+                                for (const r of roles) {
+                                    if (r && r.id) roleIds.push(String(r.id));
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { }
+                if (!confirm("确定删除账号 [" + account + "] 吗？\n将删除该账号下登录器保存的记录，并彻底删除其下 " + roleIds.length + " 个角色的全部配置（自命令/触发器/流程/角色设置/游戏设置）。\n此操作不可恢复！\n继续？")) return;
+                // 1) 逐个角色静默删除配置
+                let cfgDel = 0;
+                if (unsafeWindow && unsafeWindow.WG && unsafeWindow.WG.clear_role_data) {
+                    for (const rid of roleIds) {
+                        try { unsafeWindow.WG.clear_role_data(rid, true); cfgDel++; } catch (e) { }
+                    }
+                }
+                // 2) 从账号库删除该账号记录
+                try {
+                    const raw = localStorage.getItem("mud_game_account_data");
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        if (data[account]) {
+                            delete data[account];
+                            localStorage.setItem("mud_game_account_data", JSON.stringify(data));
+                        }
+                    }
+                } catch (e) { }
+                this.accountData = {};
+                this.loadData();
+                this.populateAccountsDropdown();
+                this.resetDropdowns(["#wsmud-login-servers", "#wsmud-login-roles"]);
+                alert("已删除账号 [" + account + "] 及其下 " + roleIds.length + " 个角色的配置");
+            });
 
             $(".wsmud-login-select").on("focus", function () {
                 $(this).addClass("focused");
@@ -346,23 +418,36 @@
             $status.css("opacity", 0.6).animate({ opacity: 1 }, 200);
         },
 
-        // 必要时返回到登录界面
+        // 【2026-08-23 修复】必要时返回到登录界面
+        // 之前用"点一次按钮 + 硬等面板"逐步退回，被顶重登时常因面板未及时渲染而超时抛错
+        // （报"操作超时: 等待 #slist_panel 失败"）中断整个登录流程，卡在角色/区服界面。
+        // 现改为：循环检测当前所在面板并点击对应返回按钮，每轮短等，最多 12 秒；全程不抛错，
+        // 无论初始停在登录/区服/角色哪个面板都能退回登录框（面板加载慢时下一轮继续处理）。
         ensureLoginScreen: async function () {
             this.updateStatus("需要切换账号，正在返回登录界面...");
-            if ($("#login_panel").is(":visible")) {
-                this.updateStatus("已在登录界面。");
-                return;
+            const start = Date.now();
+            while (Date.now() - start < 12000) {
+                try {
+                    if ($("#login_panel").is(":visible")) {
+                        this.updateStatus("已在登录界面。");
+                        return true;
+                    }
+                    if ($("#role_panel").is(":visible")) {
+                        $('.panel_item[command="ToServerPanel"]').click();
+                        await this.sleep(400);
+                        continue;
+                    }
+                    if ($("#slist_panel").is(":visible")) {
+                        if (typeof unsafeWindow.CloseServer === "function") unsafeWindow.CloseServer();
+                        $('.panel_item[command="ReLogin"]').click();
+                        await this.sleep(400);
+                        continue;
+                    }
+                } catch (e) { }
+                await this.sleep(300);
             }
-            if ($("#role_panel").is(":visible")) {
-                $('.panel_item[command="ToServerPanel"]').click();
-                await this.waitForElementVisible("#slist_panel", 5e3);
-            }
-            if ($("#slist_panel").is(":visible")) {
-                if (typeof unsafeWindow.CloseServer === "function") unsafeWindow.CloseServer();
-                $('.panel_item[command="ReLogin"]').click();
-                await this.waitForElementVisible("#login_panel", 5e3);
-            }
-            this.updateStatus("已成功返回登录界面。");
+            this.updateStatus("返回登录界面超时，继续尝试登录...");
+            return false;
         },
 
         // 【2026-08-13 自动恢复】重连失败刷新页面后，自动按上次登录的账号/区服/角色重新登录
@@ -379,8 +464,32 @@
                     try { if (typeof PushAlert === 'function') PushAlert('relogin_fail', '⚠️ 自动重登失败：未找到已保存的账号，请手动登录'); } catch (e) { }
                     return;
                 }
-                // 优先用上次登录的角色；没有则取第一个账号/区服/角色
+                // 优先用"被顶抢回目标角色"（__extForceRelogin 写下的被顶事件角色），避免跳到别的号
+                const kickTarget = localStorage.getItem("ext_kick_recover_role");
                 let targetAccount = null, targetServer = null, targetRole = null;
+                if (kickTarget) {
+                    outer2:
+                    for (const acc in this.accountData) {
+                        if (!this.accountData.hasOwnProperty(acc)) continue;
+                        for (const sv in this.accountData[acc]) {
+                            if (sv === "password") continue;
+                            const info = this.accountData[acc][sv];
+                            const roles = (info && info.roles) || [];
+                            for (const r of roles) {
+                                if (r && String(r.id) === String(kickTarget)) {
+                                    targetAccount = acc; targetServer = sv; targetRole = String(r.id);
+                                    break outer2;
+                                }
+                            }
+                        }
+                    }
+                    localStorage.removeItem("ext_kick_recover_role");   // 只消费一次
+                    if (targetAccount) {
+                        await this.loginToRole(targetAccount, targetServer, targetRole);
+                        return;
+                    }
+                }
+                // 优先用上次登录的角色；没有则取第一个账号/区服/角色
                 outer:
                 for (const acc in this.accountData) {
                     if (!this.accountData.hasOwnProperty(acc)) continue;
@@ -561,13 +670,15 @@
                 $("#login_name").val(account);
                 $("#login_pwd").val(password);
                 $('.panel_item[command="LoginIn"]').click();
-                await this.waitForElementVisible("#slist_panel", 1e4);
+                // 【2026-08-23 修复】区服列表异步加载，软等待：超时不中断，跳过继续选服
+                await this.waitForElementVisibleSoft("#slist_panel", 1e4);
 
                 this.updateStatus("步骤2/3: 正在选择区服...");
                 // 【2026-08-14 修复】稳健选服：列表项文本是"武神传说2  服务器名"，按包含匹配 + 校验选中
                 await this.selectServerByName(server);
                 $('.panel_item[command="SelectServer"]').click();
-                await this.waitForElementVisible("#role_panel", 1e4);
+                // 【2026-08-23 修复】角色列表异步加载，软等待：超时不中断，继续走选角色（内部自带轮询兜底）
+                await this.waitForElementVisibleSoft("#role_panel", 1e4);
 
                 this.updateStatus("步骤3/3: 正在选择角色...");
                 // 【2026-08-14 修复】稳健选角：等角色项渲染 + 校验选中
@@ -582,7 +693,7 @@
             }
         },
 
-        // 轮询等待元素可见
+        // 轮询等待元素可见（硬等待：超时 reject）
         waitForElementVisible: function (selector, timeout) {
             return new Promise((resolve, reject) => {
                 const startTime = Date.now();
@@ -594,6 +705,29 @@
                     } else if (Date.now() - startTime > timeout) {
                         clearInterval(interval);
                         reject(`操作超时: 等待 ${selector} 失败`);
+                    }
+                }, 200);
+            });
+        },
+
+        // 【2026-08-23 修复】软等待：元素可见返回 true，超时不抛错直接返回 false。
+        // 用于自动重登流程中"区服/角色面板"这类异步加载面板——超时不应中断整体登录，
+        // 后续 selectServerByName / selectRoleById 内部自带轮询+校验兜底，等面板渲染出来即可选中。
+        waitForElementVisibleSoft: function (selector, timeout) {
+            return new Promise((resolve) => {
+                const startTime = Date.now();
+                const interval = setInterval(() => {
+                    try {
+                        const $element = $(selector);
+                        if ($element.is(":visible")) {
+                            clearInterval(interval);
+                            resolve(true);
+                            return;
+                        }
+                    } catch (e) { }
+                    if (Date.now() - startTime > timeout) {
+                        clearInterval(interval);
+                        resolve(false);
                     }
                 }, 200);
             });

@@ -523,7 +523,8 @@
 // buff的sid：(sid)
 // buff层数：(count)
 // duration持续时间：(duration);
-// buff的名字：(name)`;
+// buff的名字：(name)
+// ⚠ 填写提示：多个 BuffId 用单个 | 分隔，如 weapon|sword`;
         const t = new TriggerTemplate("Buff状态改变", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -588,7 +589,8 @@
 // 聊天信息内容：(content)
 // 发言人：(name)
 // 发言人id：(id)
-// 频道：(channel)`;
+// 频道：(channel)
+// ⚠ 填写提示：发言人/忽略发言人 多个用单个 | 分隔；关键字 用 || 或、&& 且、() 括号组合`;
         const t = new TriggerTemplate("新聊天信息", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -637,7 +639,8 @@
         let filters = [name];
         const intro = `// 人物刷新触发器
 // 刷新人物id：(id)
-// 刷新人物名称：(name)`;
+// 刷新人物名称：(name)
+// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
         const t = new TriggerTemplate("人物刷新", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -668,7 +671,8 @@
 // 拾取物品id：(id)
 // 拾取物品名称：(name)
 // 拾取物品数量：(count)
-// 物品品质：(quality)  值：白、绿、蓝、黄、紫、橙、红、未知`;
+// 物品品质：(quality)  值：白、绿、蓝、黄、紫、橙、红、未知
+// ⚠ 填写提示：名称关键字 用 || 或、&& 且、() 括号组合，如 玄铁剑 || 倚天剑`;
         const t = new TriggerTemplate("物品拾取", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -710,7 +714,8 @@
         const name = new InputFilter("关键字", InputFilterFormat.text, "", KeyAssert);
         let filters = [name];
         const intro = `// 新提示信息触发器
-// 提示信息：(text)`;
+// 提示信息：(text)
+// ⚠ 填写提示：关键字 用 || 或、&& 且、() 括号组合`;
         const t = new TriggerTemplate("新提示信息", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -737,7 +742,8 @@
         const name = new InputFilter("关键字", InputFilterFormat.text, "", KeyAssert);
         let filters = [name];
         const intro = `// 社交消息触发器
-// 社交消息：(msg)`;
+// 社交消息：(msg)
+// ⚠ 填写提示：关键字 用 || 或、&& 且、() 括号组合`;
         const t = new TriggerTemplate("社交消息", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -765,6 +771,7 @@
         let filters = [key, grade];
         const intro = `// 拍卖查询触发器
 // 拍卖需要使用pm list来触发
+// ⚠ 填写提示：关键字 用 || 或、&& 且、() 括号组合；物品等级 多个用单个 | 分隔，如 1|2|3`;
 // 物品id：(id)
 // 物品名字：(name)
 // 物品等级：(grade)
@@ -863,7 +870,8 @@
 // 活动名称：(event);
 // 活动关键词：(content);
 // 活动等级：(grade);
-// 活动持续时间：当日时间戳(times);值为：(小时)*3600+(分钟)*60+(秒)`;
+// 活动持续时间：当日时间戳(times);值为：(小时)*3600+(分钟)*60+(秒)
+// ⚠ 填写提示：关键字 用 || 或、&& 且、() 括号组合`;
         const t = new TriggerTemplate("活动事件", filters, intro);
         TriggerTemplateCenter.add(t);
         const run = function () {
@@ -992,11 +1000,15 @@
             if (lh == null || /^\s*$/.test(String(lh)) || /^\s*\*\s*$/.test(String(lh))) return true;
             return String(lh).split("|").indexOf(String(rh)) != -1;
         };
-        const hour = new InputFilter("时", InputFilterFormat.text, "", TimeReachedAssert);
-        const minute = new InputFilter("分", InputFilterFormat.text, "", TimeReachedAssert);
-        const second = new InputFilter("秒", InputFilterFormat.text, "", TimeReachedAssert);
+        const hour = new InputFilter("hour", InputFilterFormat.text, "", TimeReachedAssert);
+        hour.description("时");
+        const minute = new InputFilter("minute", InputFilterFormat.text, "", TimeReachedAssert);
+        minute.description("分");
+        const second = new InputFilter("second", InputFilterFormat.text, "", TimeReachedAssert);
+        second.description("秒");
         let filters = [hour, minute, second];
-        const intro = "// 时辰已到触发器\n// 时/分/秒：留空或填 * = 任意；填 1|2|3 = 多个可选；填 5 = 仅 5\n// 例(每个整点)：时留空、分=0、秒=0";
+        const intro = `// 时辰已到触发器
+// ⚠ 填写提示：时/分/秒 留空或填 * = 任意；填 1|2|3 = 多个可选；填 5 = 仅 5；例（每个整点）：时留空、分=0、秒=0`;
         const t = new TriggerTemplate("时辰已到", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -1004,9 +1016,9 @@
             function timer() {
                 const date = new Date();
                 const params = {
-                    "时": date.getHours(),
-                    "分": date.getMinutes(),
-                    "秒": date.getSeconds()
+                    "hour": date.getHours(),
+                    "minute": date.getMinutes(),
+                    "second": date.getSeconds()
                 };
                 const n = new Notification("时辰已到", params);
                 NotificationCenter.post(n);
@@ -1034,14 +1046,16 @@
         const intro = `// 技能释放触发器
 // 技能id：(id)
 // 出招时间：(rtime)
-// 冷却时间：(distime)`;
+// 冷却时间：(distime)
+// ⚠ 填写提示：技能id 多个用单个 | 分隔，如 100|200`;
         const t = new TriggerTemplate("技能释放", filters, intro);
         TriggerTemplateCenter.add(t);
 
         const sid1 = new InputFilter("技能id", InputFilterFormat.text, "", ContainAssert);
         let filters1 = [sid1];
         const intro1 = `// 技能冷却结束触发器
-// 技能id：(id)`;
+// 技能id：(id)
+// ⚠ 填写提示：技能id 多个用单个 | 分隔，如 100|200`;
         const t1 = new TriggerTemplate("技能冷却结束", filters1, intro1);
         TriggerTemplateCenter.add(t1);
 
@@ -1096,7 +1110,8 @@
 // 人物当前气血：(hp)
 // 人物最大气血：(maxHp)
 // 人物当前内力：(mp)
-// 人物最大内力：(maxMp)`;
+// 人物最大内力：(maxMp)
+// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
         const t = new TriggerTemplate("气血内力改变", filters, intro);
         TriggerTemplateCenter.add(t);
 
@@ -1210,7 +1225,8 @@
 // 人物id：(id)
 // 人物名称：(name)
 // 伤害数值：(value)
-// 伤害百分比：(percent)`;
+// 伤害百分比：(percent)
+// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
         const t = new TriggerTemplate("伤害已满", filters, intro);
         TriggerTemplateCenter.add(t);
 
