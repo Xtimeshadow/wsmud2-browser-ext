@@ -20,7 +20,7 @@ Dialog.jh_fam = {
         return this.showDetail(_t725);
     },
     'showDetail': function(_t726) {
-        var _a59 = ["<pre><hig>"];
+        const _a59 = ["<pre><hig>"];
         _a59.push(_t726.name);
         _a59.push("</hig>\n");
         _a59.push(_t726.desc);

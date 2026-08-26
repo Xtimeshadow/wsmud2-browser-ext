@@ -418,7 +418,10 @@ const Process = {
         MAP.UpdateMap(_t153.map, _t153);
     },
     'dialog': function(_t154) {
-        Dialog.show(_t154.dialog, _t154);
+        if (_t154.dialog === 'pm')
+            Dialog.pm.onData(_t154);
+        else
+            Dialog.show(_t154.dialog, _t154);
     },
     'sc': function(_t155) {
         Combat.StatusChanged(_t155);

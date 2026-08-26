@@ -141,12 +141,12 @@ Object.assign(WG, {
     get_all: function () { for (let [id, item] of GameState.items) { if (item.name.indexOf("尸体") != -1) WG.Send("get all from " + id); } },
     auto_perform_button: function () {
         var on = (auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true');
-        $(".auto_perform").text(on ? "自动攻击：开" : "自动攻击：关");
+        $(".auto_perform").html(on ? '<span style="color:#00FF00">自动攻击：开</span>' : '<span style="color:#FF0000">自动攻击：关</span>');
     },
     cmd_echo_button: function () {
         if (cmd_echo) { cmd_echo = false; messageAppend("<hio>命令代码关闭</hio>"); }
         else { cmd_echo = true; messageAppend("<hio>命令代码显示</hio>"); }
-        $(".cmd_echo").text("代码：" + (cmd_echo ? "开" : "关"));
+        $(".cmd_echo").html(cmd_echo ? '<span style="color:#00FF00">代码：开</span>' : '<span style="color:#FF0000">代码：关</span>');
     },
     getItemNameByid: (id, callback) => {
         GameState.packs.items.forEach(function (item) { if (item != 0 && item.id == id) { callback(item.name); return; } });

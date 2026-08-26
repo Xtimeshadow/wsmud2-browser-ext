@@ -215,8 +215,8 @@ WSClient.prototype.OnReceived = function(_t1423) {
 WSClient.prototype.Send = function(_t1426) {
     try {
         this.ws.send(_t1426);
-    } catch (_t1427) {
-        ReceiveMessage(_t1427);
+    } catch (e) {
+        ReceiveMessage(e);
     }
 }
 ,

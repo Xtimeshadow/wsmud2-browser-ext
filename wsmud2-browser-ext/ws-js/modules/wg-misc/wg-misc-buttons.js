@@ -95,8 +95,17 @@ Object.assign(WG, {
               }
               $(".auto_perform").on("click", WG.auto_preform_switch);
               $(".cmd_echo").on("click", WG.cmd_echo_button);
-              $(".cmd_echo").text("代码：" + (cmd_echo ? "开" : "关"));   // 【2026-08-11】按钮显示开关状态
-              $(".auto_perform").text((auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true') ? "自动攻击：开" : "自动攻击：关");   // 【2026-08-15】自动攻击按钮显示开关状态
+              if (cmd_echo) {
+                  $(".cmd_echo").html('<span style="color:#00FF00">代码：开</span>');
+              } else {
+                  $(".cmd_echo").html('<span style="color:#FF0000">代码：关</span>');
+              }
+              var autoOn = (auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true');
+              if (autoOn) {
+                  $(".auto_perform").html('<span style="color:#00FF00">自动攻击：开</span>');
+              } else {
+                  $(".auto_perform").html('<span style="color:#FF0000">自动攻击：关</span>');
+              }
           } else if (type == 'off') {
               inzdy_btn = false;
 
@@ -108,8 +117,17 @@ Object.assign(WG, {
               $(".go_home").on("click", WG.go_home);
               $(".auto_perform").on("click", WG.auto_preform_switch);
               $(".cmd_echo").on("click", WG.cmd_echo_button);
-              $(".cmd_echo").text("代码：" + (cmd_echo ? "开" : "关"));   // 【2026-08-11】按钮显示开关状态
-              $(".auto_perform").text((auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true') ? "自动攻击：开" : "自动攻击：关");   // 【2026-08-15】自动攻击按钮显示开关状态
+              if (cmd_echo) {
+                  $(".cmd_echo").html('<span style="color:#00FF00">代码：开</span>');
+              } else {
+                  $(".cmd_echo").html('<span style="color:#FF0000">代码：关</span>');
+              }
+              var autoOn = (auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true');
+              if (autoOn) {
+                  $(".auto_perform").html('<span style="color:#00FF00">自动攻击：开</span>');
+              } else {
+                  $(".auto_perform").html('<span style="color:#FF0000">自动攻击：关</span>');
+              }
               if (GameState.score.isGod) {
                   $('.zdy-item.zdwk').html("修炼(Y)");
               }
