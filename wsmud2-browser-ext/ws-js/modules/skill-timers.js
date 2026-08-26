@@ -1,251 +1,146 @@
+// ============================================================
+// skill-timers.js —— 技能 CD 与 Buff 倒计时
+// ------------------------------------------------------------
+//   showSkillCD     在技能按钮上显示剩余冷却秒数
+//   showBuffDuration 在状态栏显示 Buff 剩余时间
+// 想改倒计时的显示样式/刷新频率 → 在本文件搜索。
+//
+// 【2026-08-14 性能优化】倒计时渲染从"每个 Buff/技能各开一条递归 setTimeout 链"
+// 改为【单一 200ms 主时钟】统一推进：只保留一个 setInterval，所有倒计时登记在
+// skillCDTimers / buffTimers 两个 Map 里，主时钟每 tick 统一推进并渲染。
+// 顺带优化：显示文本没变化时不再重写 DOM（长 CD 原本每秒白白重写 5 次）。
+// 对外函数签名完全不变（showSkillCD / showBuffDuration / clear* 照旧）。
+// ============================================================
 // skill-timers.js
 // Skill CD and Buff duration timers
-// 使用单一 200ms 主时钟统一管理所有 CD/Buff 倒计时
 'use strict';
 
-// ============================================================
-// 中央计时器注册表
-// ============================================================
-var _timerRegistry = [];      // 所有活跃定时器条目
-var _mainClockId = null;      // 主时钟 setInterval ID
-var _nextTimerId = 1;         // 自增 ID
+// 保存技能CD和BUFF定时器的Map（key → 倒计时登记项 {kind, selector, remaining, colorTag, ...}）
+var skillCDTimers = new Map();
+var buffTimers = new Map();
 
-// 获取下一个唯一 ID
-function _nextId() {
-    return _nextTimerId++;
+// 获取BUFF定时器的组合键
+function getBuffTimerKey(sid, id) {
+    return `${sid}-${id}`;
 }
 
-// 主时钟 tick 函数（200ms 间隔）
-function _mainTick() {
-    var now = Date.now();
-    for (var i = _timerRegistry.length - 1; i >= 0; i--) {
-        var entry = _timerRegistry[i];
-        if (!entry) continue;
+// ---------------- 单一主时钟 ----------------
+var _masterTimer = null;             // 全局唯一的倒计时时钟
+const _MASTER_INTERVAL = 200;        // 主时钟 tick 间隔（毫秒）
 
-        var elapsed = now - entry.startTime;
-        var remaining = entry.totalMs - elapsed;
-
-        if (remaining <= 0) {
-            // 计时结束
-            _updateDisplay(entry, 0);
-            _timerRegistry.splice(i, 1);
-            if (entry.onExpire) entry.onExpire();
-        } else {
-            _updateDisplay(entry, remaining);
-        }
-    }
+// 确保主时钟在跑（有登记项时才启动，全部结束后自动停）
+function _ensureMaster() {
+    if (_masterTimer) return;
+    _masterTimer = setInterval(_masterTick, _MASTER_INTERVAL);
 }
 
-// 启动主时钟（如尚未启动）
-function _ensureMainClock() {
-    if (_mainClockId === null) {
-        _mainClockId = setInterval(_mainTick, 200);
-    }
+// 当前要显示的文字（>60 秒显示整数秒，否则显示 0.1 秒精度）
+function _displayText(entry) {
+    var secs = entry.remaining / 1000;
+    return secs > 60 ? Math.ceil(secs).toFixed(0) : secs.toFixed(1);
 }
 
-// 停止主时钟（无活跃定时器时自动停止）
-function _stopMainClockIfEmpty() {
-    if (_mainClockId !== null && _timerRegistry.length === 0) {
-        clearInterval(_mainClockId);
-        _mainClockId = null;
-    }
-}
-
-// ============================================================
-// 显示更新函数
-// ============================================================
-function _getDisplayTime(remainingMs) {
-    var seconds = remainingMs / 1000;
-    if (seconds > 60) {
-        return Math.ceil(seconds).toFixed(0);
-    } else {
-        return seconds.toFixed(1);
-    }
-}
-
-function _buildDisplayHtml(originalText, colorTag, displayTime, shadowStyle, isPfmItem) {
-    if (isPfmItem) {
-        // 技能CD：右上角小字浮层，不撑开行高
-        return originalText
-            + '<span class="cd-overlay" style="position:absolute;top:0;right:0;font-size:10px;line-height:1;pointer-events:none;">'
-            + '<' + colorTag + '>' + displayTime + 's</' + colorTag + '>'
-            + '</span>'
-            + shadowStyle;
-    } else {
-        // Buff 等其他情况
-        return originalText
-            + '<' + colorTag + '>' + displayTime + 's</' + colorTag + '>'
-            + shadowStyle;
-    }
-}
-
-function _updateDisplay(entry, remainingMs) {
-    var isPfmItem = entry.selector.startsWith('.pfm-item');
-    var displayTime = remainingMs > 0 ? _getDisplayTime(remainingMs) : '0.0s';
-
+// 渲染一个登记项：文本没变就不动 DOM（长 CD 每秒只写一次，不再 5 次/秒）
+function _renderEntry(entry) {
+    var text = _displayText(entry);
     var elements = document.querySelectorAll(entry.selector);
-    elements.forEach(function (el) {
-        var shadowElement = el.querySelector('.shadow');
-        var shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-        el.innerHTML = _buildDisplayHtml(entry.originalText, entry.colorTag, displayTime, shadowStyle, isPfmItem);
+    var found = elements.length > 0;
+    if (text === entry.lastText && !(entry._missing && found)) return;
+    entry.lastText = text;
+    entry._missing = !found;
+    elements.forEach((el) => {
+        if (entry.kind === 'skill') {
+            // 技能 CD：右上角浮层显示（26.4样式），不改变技能行内容/行高
+            let float = el.querySelector('.cd-overlay');
+            if (!float) {
+                float = document.createElement('span');
+                float.className = 'cd-overlay';
+                float.style.cssText = 'position:absolute;top:0;right:0;font-size:10px;line-height:1;pointer-events:none;';
+                el.appendChild(float);
+            }
+            float.innerHTML = '<' + (entry.colorTag || 'hir') + '>' + text + 's</' + (entry.colorTag || 'hir') + '>';
+        } else {
+            // BUFF：内文追加剩余时间（保持原实现的行为）
+            const shadowElement = el.querySelector('.shadow');
+            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
+            el.innerHTML = `${entry.originalText}<${entry.colorTag}>${text}s</${entry.colorTag}>${shadowStyle}`;
+        }
     });
 }
 
-// ============================================================
-// 注册/注销定时器
-// ============================================================
-function _registerTimer(selector, id, originalText, totalMs, colorTag, onExpire) {
-    var timerId = _nextId();
-    var entry = {
-        timerId: timerId,
-        key: id,
-        selector: selector,
-        originalText: originalText,
-        totalMs: totalMs,
-        colorTag: colorTag,
-        startTime: Date.now(),
-        onExpire: onExpire
-    };
-    _timerRegistry.push(entry);
-    _ensureMainClock();
-    return timerId;
-}
-
-function _unregisterTimer(key) {
-    for (var i = 0; i < _timerRegistry.length; i++) {
-        if (_timerRegistry[i] && _timerRegistry[i].key === key) {
-            _timerRegistry.splice(i, 1);
-            break;
+// 倒计时结束的还原：技能移除浮层；BUFF 恢复原始文本
+// 【2026-08-14 修复】BUFF 到期改为"名字 + shadow 星标"一起恢复（原实现只恢复名字，
+// 与 clearBuffDisplay 的行为不一致，会把 buff 的 shadow 星标弄丢）
+function _restoreEntry(entry) {
+    const elements = document.querySelectorAll(entry.selector);
+    elements.forEach((el) => {
+        if (entry.kind === 'skill') {
+            const f = el.querySelector('.cd-overlay');
+            if (f) f.remove();
+        } else if (el.originalText) {
+            const shadowElement = el.querySelector('.shadow');
+            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
+            el.innerHTML = `${el.originalText}${shadowStyle}`;
+            el.originalText = null;
         }
-    }
-    _stopMainClockIfEmpty();
-}
-
-// ============================================================
-// 对外接口
-// ============================================================
-
-// 技能CD显示函数
-function showSkillCD(id, distime, overtime) {
-    if (skillCD !== "开" && skillCD !== true && skillCD !== 'true') return;
-
-    var elements = document.querySelectorAll('.pfm-item[pid="' + id + '"]');
-    if (elements.length === 0) {
-        console.log('找不到SKILL元素:pid=' + id);
-        return;
-    }
-
-    // 清除旧定时器
-    clearSkillCDDisplay(id);
-
-    // 保存原始文本
-    var originalText = '';
-    elements.forEach(function (el) {
-        if (el.originalText) {
-            el.innerHTML = el.originalText;
-        }
-        el.originalText = el.innerHTML;
-        if (!originalText) originalText = el.innerHTML;
     });
-
-    var totalSeconds = (distime - (overtime || 0)) / 1000;
-    var totalMs = totalSeconds * 1000;
-
-    if (totalMs <= 0) return;
-
-    _registerTimer(
-        '.pfm-item[pid="' + id + '"]',
-        'skill_' + id,
-        originalText,
-        totalMs,
-        skillCDColor || 'hir',
-        function () {
-            // 过期后重置
-            var els = document.querySelectorAll('.pfm-item[pid="' + id + '"]');
-            els.forEach(function (el) {
-                if (el.originalText) {
-                    var shadowElement = el.querySelector('.shadow');
-                    var shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-                    el.innerHTML = el.originalText
-                        + '<span class="cd-overlay" style="position:absolute;top:0;right:0;font-size:10px;line-height:1;pointer-events:none;">'
-                        + '<' + (skillCDColor || 'hir') + '>0.0s</' + (skillCDColor || 'hir') + '>'
-                        + '</span>'
-                        + shadowStyle;
-                }
-            });
-        }
-    );
 }
 
-// 清除技能CD显示
+// 主时钟 tick：推进所有倒计时，到期的还原并移除；全部清空后停表
+function _masterTick() {
+    var expired = [];
+    skillCDTimers.forEach(function (entry, key) {
+        entry.remaining -= _MASTER_INTERVAL;
+        if (entry.remaining <= 0) { expired.push(entry); skillCDTimers.delete(key); return; }
+        _renderEntry(entry);
+    });
+    buffTimers.forEach(function (entry, key) {
+        entry.remaining -= _MASTER_INTERVAL;
+        if (entry.remaining <= 0) { expired.push(entry); buffTimers.delete(key); return; }
+        _renderEntry(entry);
+    });
+    for (var i = 0; i < expired.length; i++) _restoreEntry(expired[i]);
+    if (!skillCDTimers.size && !buffTimers.size && _masterTimer) {
+        clearInterval(_masterTimer);
+        _masterTimer = null;
+    }
+}
+
+// ---------------- 对外接口（签名与原实现一致） ----------------
+
+// 清除技能CD显示函数
 function clearSkillCDDisplay(id) {
-    var key = 'skill_' + id;
-    _unregisterTimer(key);
+    // 查找技能元素
+    const elements = document.querySelectorAll(`.pfm-item[pid="${id}"]`);
+    if (elements.length === 0) return;
 
-    var elements = document.querySelectorAll('.pfm-item[pid="' + id + '"]');
-    elements.forEach(function (el) {
+    elements.forEach((el) => {
         if (el.originalText) {
             el.innerHTML = el.originalText;
         }
     });
-}
 
-// BUFF持续时间显示函数
-function showBuffDuration(sid, duration, id, count, overtime) {
-    if (buffCD !== "开" && buffCD !== true && buffCD !== 'true') return;
-
-    // 延时等待元素刷新
-    setTimeout(function () {
-        var elements = document.querySelectorAll('.room-item[itemid="' + id + '"] .status-item[sid="' + sid + '"]');
-        if (elements.length === 0) {
-            console.log('找不到BUFF元素: sid=' + sid + ', id=' + id);
-            return;
-        }
-
-        var key = 'buff_' + sid + '_' + id;
-        clearBuffDisplay(sid, id);
-
-        var newOriginalText = '';
-        elements.forEach(function (el) {
-            if (el.originalText) {
-                el.innerHTML = el.originalText;
-            }
-            newOriginalText = el.firstChild ? el.firstChild.nodeValue.trim() : el.textContent.trim();
-            el.originalText = newOriginalText;
-        });
-
-        var finalOriginalText = elements[0].originalText;
-        if (count > 0) {
-            finalOriginalText = finalOriginalText.replace(/x\d+$/, '') + 'x' + count;
-        }
-
-        var totalMs = (duration + 100) - (overtime || 0);
-        if (totalMs <= 0) return;
-
-        _registerTimer(
-            '.room-item[itemid="' + id + '"] .status-item[sid="' + sid + '"]',
-            key,
-            finalOriginalText,
-            totalMs,
-            buffCDColor || 'hir',
-            function () {
-                clearBuffDisplay(sid, id);
-            }
-        );
-    }, 100);
+    if (skillCDTimers.has(id)) {
+        skillCDTimers.delete(id);
+    }
 }
 
 // 清除单个BUFF定时
 function clearBuffDisplay(sid, id) {
-    var key = 'buff_' + sid + '_' + id;
-    _unregisterTimer(key);
+    const key = getBuffTimerKey(sid, id);
 
-    var elements = document.querySelectorAll('.room-item[itemid="' + id + '"] .status-item[sid="' + sid + '"]');
-    elements.forEach(function (el) {
+    if (buffTimers.has(key)) {
+        buffTimers.delete(key);
+    }
+
+    const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
+
+    elements.forEach((el) => {
         if (el.originalText) {
-            var shadowElement = el.querySelector('.shadow');
-            var shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-            el.innerHTML = el.originalText + shadowStyle;
+            const shadowElement = el.querySelector('.shadow');
+            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
+
+            el.innerHTML = `${el.originalText}${shadowStyle}`;
             el.originalText = null;
         }
     });
@@ -253,22 +148,95 @@ function clearBuffDisplay(sid, id) {
 
 // 清除所有BUFF定时
 function clearAllBuffTimers() {
-    // 移除所有 buff_ 开头的定时器
-    for (var i = _timerRegistry.length - 1; i >= 0; i--) {
-        if (_timerRegistry[i] && _timerRegistry[i].key.indexOf('buff_') === 0) {
-            _timerRegistry.splice(i, 1);
-        }
-    }
-    _stopMainClockIfEmpty();
+    buffTimers.clear();
 
     // 恢复原始文本
-    var allStatusItems = document.querySelectorAll('.status-item');
-    allStatusItems.forEach(function (el) {
+    const allStatusItems = document.querySelectorAll('.status-item');
+    allStatusItems.forEach((el) => {
         if (el.originalText) {
-            var shadowElement = el.querySelector('.shadow');
-            var shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-            el.innerHTML = el.originalText + shadowStyle;
+            const shadowElement = el.querySelector('.shadow');
+            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
+
+            el.innerHTML = `${el.originalText}${shadowStyle}`;
             el.originalText = null;
         }
     });
+}
+
+// 技能CD显示函数
+function showSkillCD(id, distime, overtime = 0) {
+    // 【2026-08-15 移植上游 26.2】开关兼容 true / 'true'（旧配置或导入数据可能存成布尔值）
+    if (skillCD !== "开" && skillCD !== true && skillCD !== 'true') return;
+    // 查找元素
+    const elements = document.querySelectorAll(`.pfm-item[pid="${id}"]`);
+    if (elements.length === 0) {ExtLog.warn(`找不到SKILL元素:pid=${id}, id=${id}`);return;}
+
+    clearSkillCDDisplay(id);
+
+    elements.forEach((el) => {
+        // 清除之前的计时显示，恢复原始内容
+        if (el.originalText) {
+            el.innerHTML = el.originalText;
+        }
+        // 保存当前的原始内容（不包含计时）
+        el.originalText = el.innerHTML;
+    });
+
+    // 登记倒计时（remaining 与原实现 remainingSeconds - overtime/1000 等价）
+    skillCDTimers.set(id, {
+        kind: 'skill',
+        selector: `.pfm-item[pid="${id}"]`,
+        remaining: distime - (overtime || 0),
+        colorTag: skillCDColor,
+        lastText: null,
+        _missing: false
+    });
+    _ensureMaster();
+    _renderEntry(skillCDTimers.get(id));
+}
+
+// BUFF持续时间显示函数
+function showBuffDuration(sid, duration, id, count = 0, overtime = 0) {
+    // 只有当buffCD为"开"时才执行
+    // 【2026-08-15 移植上游 26.2】开关兼容 true / 'true'
+    if (buffCD !== "开" && buffCD !== true && buffCD !== 'true') return;
+    // 延时100毫秒，等待元素刷新
+    setTimeout(() => {
+        const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
+
+        if (elements.length === 0) {ExtLog.warn(`找不到BUFF元素: sid=${sid}, id=${id}`);return;}
+
+        clearBuffDisplay(sid, id);
+
+        let newOriginalText = '';
+        elements.forEach((el) => {
+            // 清除之前的计时显示，恢复原始内容
+            if (el.originalText) {
+                el.innerHTML = el.originalText;
+            }
+            // 保存当前的原始内容（不包含计时）
+            newOriginalText = el.firstChild ? el.firstChild.nodeValue.trim() : el.textContent.trim();
+            el.originalText = newOriginalText;
+        });
+
+        // 处理refresh BUFF的层数（与原实现一致）
+        let finalOriginalText = elements[0].originalText;
+        if (count > 0) {
+            finalOriginalText = finalOriginalText.replace(/x\d+$/, '') + `x${count}`;
+        }
+
+        // 登记倒计时（原 totalSeconds=(duration+100)/1000，remaining 同理）
+        const key = getBuffTimerKey(sid, id);
+        buffTimers.set(key, {
+            kind: 'buff',
+            selector: `.room-item[itemid="${id}"] .status-item[sid="${sid}"]`,
+            remaining: (duration + 100) - (overtime || 0),
+            colorTag: buffCDColor,
+            originalText: finalOriginalText,
+            lastText: null,
+            _missing: false
+        });
+        _ensureMaster();
+        _renderEntry(buffTimers.get(key));
+    }, 100);
 }

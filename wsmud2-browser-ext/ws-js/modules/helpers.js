@@ -1,13 +1,23 @@
-// helpers.js
-// T helper functions and ProConsole
+// ============================================================
+// helpers.js —— 自命令函数库 TaskHelper（别名 T）核心
+// ------------------------------------------------------------
+// 这是 TaskHelper 的核心文件，包含基础命令处理、等待、通用动作。
+// 查找/装备相关方法 → task-helper-finders.js
+// 自动施法/状态监控相关方法 → task-helper-pfm.js
+// 你在自命令里写 T.函数名 就会调到这里：
+//   T.wait / T.batwait           等待（含"等待某个条件"）
+//   T.killall / T.getall / T.to  全杀/全捡/前往
+//   T.roll / T.cls / T.syso      掷骰子/清屏/输出
+//   T.stop / T.close / T.tts / T.beep / T.music  杂项
+// ============================================================
 'use strict';
 
-//助手函数
+// 助手函数
 const TaskHelper = {
     //private
     _recmd: function (cmds) {
         if (cmds) {
-            cmds = Array.isArray(cmds) ? cmds : cmds.split(';');
+            cmds = cmds instanceof Array ? cmds : cmds.split(';');
             cmds.baoremove(0);
             cmds = cmds.join(";");
             return cmds;
@@ -21,84 +31,14 @@ const TaskHelper = {
         }
         return cmds;
     },
-    findhook: undefined,
-    _findItem: async function (itemname, callback) {
-        console.log("finditem" + itemname);
-        TaskHelper.findhook = WG.add_hook("dialog", async function (data) {
-            if (data.items) {
-                for (let item of data.items) {
-                    if (item.name == itemname) {
-                        callback(item.id);
-                        WG.remove_hook(TaskHelper.findhook);
-                    }
-                }
-                callback("");
-            }
-            WG.remove_hook(TaskHelper.findhook);
-        });
-
-        WG.Send("pack");
-    },
-    //public
-    pname: function (idx = 0, n, cmds) {
-        TaskHelper.findPlayerByName(idx, n, cmds);
-    },
-    findPlayerByName: function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx - 1, cmds);
-        if (cmds.indexOf(",") >= 0) {
-            cmds = cmds.split(",");
-        } else {
-            cmds = cmds.split(";");
-        }
-        let p = cmds[0].split("$")[0];
-        cmds = TaskHelper.recmd(0, cmds);
-        p = p.replaceAll("-", " ");
-        if (p[p.length - 1] == " ") {
-
-            p = p.substring(0, p.length - 1)
-        }
-        console.log("findPlayerByName" + n);
-
-        for (let i = 0; i < roomData.length; i++) {
-            if (roomData[i].name && roomData[i].name.indexOf(n) >= 0) {
-                WG.Send(p + " " + roomData[i].id);
-            }
-        }
-        WG.SendCmd(cmds);
-    },
-    findItem: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx - 1, cmds);
-        if (cmds.indexOf(",") >= 0) {
-            cmds = cmds.split(",");
-        } else {
-            cmds = cmds.split(";");
-        }
-        let p = cmds[0].split(" ")[0];
-        cmds = TaskHelper.recmd(0, cmds);
-        console.log("finditem" + n);
-
-        WG.Send("pack");
-        // console.log(GameState.packs.items)
-        for (let item of GameState.packs.items) {
-            if (item.name == n) {
-                if (p == "fenjie" || p == "drop") {
-                    if (item.name.indexOf("★") >= 0) {
-                        messageAppend("高级物品 ,不分解");
-                        continue;
-                    }
-                }
-                WG.SendCmd(p + " " + item.id);
-            }
-        }
-
-        WG.SendCmd(cmds);
-    },
+    // 等待指定毫秒
     wait: async function (idx = 0, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         console.log("延时:" + n + "ms,延时触发:" + cmds);
         await WG.sleep(parseInt(n));
         WG.SendCmd(cmds);
     },
+    // 战斗中等待
     batwait: async function (idx = 0, n, cmds) {
         if (GameState.fight.in_fight) {
             cmds = TaskHelper.recmd(idx, cmds);
@@ -107,7 +47,7 @@ const TaskHelper = {
             WG.SendCmd(cmds);
         }
     },
-
+    // 前往光明之巅
     gogzm: async function () {
         WG.SendCmd("jh fam 9 start;go enter;go up;")
         await WG.sleep(1000);
@@ -119,6 +59,7 @@ const TaskHelper = {
         }
         WG.SendCmd("ggdl " + ltId + ";go north;go north;go north;go north;$wait 250;go north;go north;$wait 250;look shi;tiao1 shi;tiao1 shi;tiao2 shi;$wait 250;jumpdown;")
     },
+    // 前往道德不板
     godddb: async function () {
         WG.SendCmd("jh fam 9 start;go enter;go up;")
         await WG.sleep(1000);
@@ -130,314 +71,125 @@ const TaskHelper = {
         }
         WG.SendCmd("ggdl " + ltId + ";go north;go north;go north;go north;$wait 250;go north;go down;")
     },
+    // 全杀
     killall: async function (idx = 0, n = null, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.kill_all();
         await WG.sleep(100);
         WG.SendCmd(cmds);
     },
+    // 全捡
     getall: async function (idx = 0, n = null, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.get_all();
         await WG.sleep(100);
         WG.SendCmd(cmds);
     },
+    // 前往指定地点
     to: async function (idx = 0, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.go(n);
         await WG.sleep(100);
         WG.SendCmd(cmds);
     },
+    // 自动打坐
     zdwk: async function (idx = 0, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.zdwk();
         await WG.sleep(100);
         WG.SendCmd(cmds);
     },
+    // 停止打坐
     rzdwk: async function (idx = 0, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.zdwk("", false);
         await WG.sleep(100);
         WG.SendCmd(cmds);
     },
-    killhook: undefined,
-    killw: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        var killid = "";
-        for (let i = 0; i < roomData.length; i++) {
-            if (roomData[i].name && roomData[i].name.indexOf(n) >= 0) {
-                killid = roomData[i].id;
-            }
-        }
-        TaskHelper.killhook = WG.add_hook('itemremove', function (data) {
-            if (data.id == killid) {
-                WG.SendCmd(cmds);
-                WG.remove_hook(TaskHelper.killhook);
-                TaskHelper.killhook = undefined;
-            }
-        });
-        WG.SendCmd("kill " + killid);
-    },
-    eqhook: undefined,
-    eqw: async function (idx = 0, n, cmds) {
-        var pcmds = TaskHelper.recmd(idx, cmds);
-        if (n.indexOf("<") >= 0) {
-            TaskHelper._findItem(n, async function (id) {
-                let p_itemid = id;
-                let p_flag = true;
-                if (p_itemid == "") {
-                    p_flag = false;
-                    WG.SendCmd(pcmds);
-                    return;
-                }
-                TaskHelper.eqhook = WG.add_hook('dialog', function (data) {
-                    if (data.eq == 0 && data.id == p_itemid) {
-                        p_flag = false;
-                        WG.SendCmd(pcmds);
-                        WG.remove_hook(TaskHelper.eqhook);
-                        TaskHelper.eqhook = undefined;
-                    }
-                });
-                while (p_flag) {
-                    WG.Send("pack");
-                    WG.SendCmd('eq ' + p_itemid);
-                    await WG.sleep(1000);
-                }
-
-            });
-        } else {
-            let p_itemid = n;
-            let p_flag = true;
-            if (p_itemid == "") {
-                p_flag = false;
-                WG.SendCmd(pcmds);
-                return;
-            }
-            TaskHelper.eqhook = WG.add_hook(['text', 'dialog'], function (data) {
-                if (data.type == 'dialog') {
-                    if (data.eq == 0 && data.id == p_itemid) {
-                        p_flag = false;
-                        WG.SendCmd(pcmds);
-                        WG.remove_hook(TaskHelper.eqhook);
-                        TaskHelper.eqhook = undefined;
-                    }
-                }
-                if (data.type == 'text') {
-                    if (data.msg.indexOf("你要装备什么") >= 0) {
-                        p_flag = false;
-                        WG.SendCmd(pcmds);
-                        WG.remove_hook(TaskHelper.eqhook);
-                        TaskHelper.eqhook = undefined;
-                    }
-                }
-            });
-            while (p_flag) {
-                WG.Send("pack");
-                WG.SendCmd('eq ' + p_itemid);
-                await WG.sleep(1000);
-            }
-        }
-    },
-    usezml: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        zml = GM_getValue(roleid + "_zml", zml);
-        for (var zmlitem of zml) {
-            if (zmlitem.name == n) {
-                await WG.zmlfire(zmlitem);
-            }
-        }
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    usetz: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        let tz = GM_getValue("extends");
-        for (var tzitem of tz) {
-            if (tzitem.name == n) {
-                await WG.sleep(100);
-                let cmd = tzitem.content;
-                SCRIPT.run(cmd);
-            }
-        }
-    },
-    waitpfm: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        let _flag = true;
-        let attemptCount = 0;
-
-        while (_flag) {
-            if (!WG.gcd && !WG.cds.get(n)?.iscd) {
-                WG.Send("perform " + n);
-                attemptCount++;
-                if (WG.cds.get(n)?.iscd && _flag) {
-                    _flag = false;
-                    WG.SendCmd(cmds);
-                }
-                if (!GameState.fight.in_fight && _flag) {
-                    _flag = false;
-                    WG.SendCmd(cmds);
-                }
-                if (attemptCount >= 1 && _flag) {
-                    _flag = false;
-                    WG.SendCmd(cmds);
-                }
-            }
-            attemptCount++;
-            await WG.sleep(350);
-        }
-
-    },
-    startjk: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        ztjk_item = GM_getValue(roleid + "_ztjk", ztjk_item);
-        for (var item of ztjk_item) {
-            if (item.name == n) {
-                item.isactive = 1;
-                GM_setValue(roleid + "_ztjk", ztjk_item);
-                WG.ztjk_func();
-                messageAppend("已注入" + item.name, 1);
-                break;
-            }
-        }
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    stopjk: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        ztjk_item = GM_getValue(roleid + "_ztjk", ztjk_item);
-        for (var item of ztjk_item) {
-            if (item.name == n) {
-                item.isactive = 0;
-                GM_setValue(roleid + "_ztjk", ztjk_item);
-                WG.ztjk_func();
-                messageAppend("已暂停" + item.name);
-                break;
-            }
-        }
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    stoppfm: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        if (auto_pfmswitch == "开" || auto_pfmswitch === true || auto_pfmswitch === 'true') {
-            auto_pfmswitch = false;
-            messageAppend("<hio>自动施法</hio>关闭");
-            WG.auto_preform("stop");
-        }
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    startpfm: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        if (auto_pfmswitch == "关" || auto_pfmswitch === false || auto_pfmswitch === 'false') {
-            auto_pfmswitch = true;
-            messageAppend("<hio>自动施法</hio>开启");
-            WG.auto_preform();
-        }
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    stopautopfm: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        var dellist = n.split(",");
-        for (let p of dellist) {
-            if (!WG.inArray(p, blackpfm)) {
-                blackpfm.push(p);
-            }
-        }
-        console.log("当前自动施法黑名单为:" + blackpfm);
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-    startautopfm: async function (idx = 0, n, cmds) {
-        cmds = TaskHelper.recmd(idx, cmds);
-        let dellist = n.split(",");
-        for (var i = 0; i < blackpfm.length; i++) {
-            for (var item of dellist) {
-                if (item == blackpfm[i]) {
-                    blackpfm.baoremove(i);
-                }
-            }
-        }
-        console.log("当前自动施法黑名单为:" + blackpfm);
-        await WG.sleep(100);
-        WG.SendCmd(cmds);
-    },
-
+    // 右键菜单
     callcontextMenu: function (idx = 0, n, cmds) {
         $('.container').contextMenu({
             x: 1,
             y: 1
         })
     },
+    // 停止所有自动
     stopallauto: function (idx = 0, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.stopAllAuto();
         messageAppend("暂停自动喜宴及自动BOSS", 1);
         WG.SendCmd(cmds);
     },
+    // 恢复所有自动
     startallauto: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.reSetAllAuto();
         messageAppend("暂停自动喜宴及自动BOSS", 1);
         WG.SendCmd(cmds);
     },
+    // 掷骰子
     roll: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         if (n == 1) {
             WG.SendCmd("pty " + Math.random() * 100);
         } else if (n == 2) {
-
             WG.SendCmd("chat " + Math.random() * 100);
         } else if (n == 3) {
-
             WG.SendCmd("say " + Math.random() * 100);
         }
         WG.SendCmd(cmds);
     },
+    // 清 DPS 统计
     clsSakada: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.clean_dps();
         WG.SendCmd(cmds);
     },
+    // 清屏
     cls: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         messageClear();
         WG.SendCmd(cmds);
     },
+    // 输出消息
     syso: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         messageAppend(n);
         WG.SendCmd(cmds);
     },
+    // 停止定时器
     stop: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         WG.timer_close();
         WG.SendCmd(cmds);
     },
+    // 关闭对话框
     close: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         KEY.dialog_close();
         WG.SendCmd(cmds);
     },
+    // TTS 语音
     tts: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         FakerTTS.playtts(n);
         WG.SendCmd(cmds);
     },
+    // 蜂鸣
     beep: async function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         Beep();
         WG.SendCmd(cmds);
     },
+    // 播放音乐
     music: function (idx, n, cmds) {
         cmds = TaskHelper.recmd(idx, cmds);
         var music = new MusicBox({
-            loop: false, // 循环播放
-            musicText: '6 - - 5 - 3 2 - 1 - - - 3 - - 2 1 - ·6 ·5 - - - ·5 - ·6 - ·5 - ·6 - 1 - - 2 - 3 5 6 - - 3 2 1 - 2',  // 绿色
-            autoplay: 6, // 自动弹奏速度
-            type: 'triangle',  // 音色类型  sine|square|triangle|sawtooth
-            duration: 2  // 键音延长时间
+            loop: false,
+            musicText: '6 - - 5 - 3 2 - 1 - - - 3 - - 2 1 - ·6 ·5 - - - ·5 - ·6 - ·5 - ·6 - 1 - - 2 - 3 5 6 - - 3 2 1 - 2',
+            autoplay: 6,
+            type: 'triangle',
+            duration: 2
         });
         WG.SendCmd(cmds);
     }

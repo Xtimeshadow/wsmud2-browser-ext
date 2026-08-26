@@ -1,3 +1,11 @@
+// ============================================================
+// chat-display.js —— 聊天显示增强
+// ------------------------------------------------------------
+//   彩虹名字（聊天里玩家名字彩色显示）
+//   智能滚动（有消息自动滚到底，自己往上翻时暂停）
+//   dateFormat 时间格式化
+// 想改聊天显示效果 → 在本文件搜索。
+// ============================================================
 // chat-display.js
 // Rainbow name, smart scroll, date format, auto scroll
 'use strict';
@@ -6,18 +14,8 @@
 var chatContainer = null;
 
 function rainbowplayer() {
-    // 等待 roleid 就绪
-    if (!roleid) {
-        setTimeout(rainbowplayer, 1000);
-        return;
-    }
-    // 等待 GameState 就绪
-    if (typeof GameState === 'undefined' || !GameState.id) {
-        setTimeout(rainbowplayer, 1000);
-        return;
-    }
     rainbow_name = GM_getValue(roleid + "_rainbow_name", rainbow_name);
-    if (rainbow_name !== "开" && rainbow_name !== true && rainbow_name !== 'true') return;
+    if (!GameState.id || (rainbow_name !== "开" && rainbow_name !== true && rainbow_name !== 'true')) return;
     var playerElement = $(`.room-item[itemid="${GameState.id}"]`);
     if (playerElement.length > 0) {
         playerElement.find('.item-name').addClass('supernova-text');
@@ -97,20 +95,6 @@ initObserver();
 setTimeout(rainbowplayer, 500);
 });
 
-// 修复聊天区点击玩家名查看玩家功能
-// 使用事件委托处理 cmd 属性（如 cmd='look3 <uid>'）
-$(document).on('click', '.container [cmd], .WG_log_log [cmd], .WG_log [cmd], .channel [cmd]', function(e) {
-    var cmd = $(this).attr('cmd');
-    if (cmd && cmd.indexOf('look3') === 0) {
-        if (typeof SendCommand === 'function') {
-            e.stopPropagation();
-            e.preventDefault();
-            SendCommand(cmd);
-            return false;
-        }
-    }
-});
-
 // 格式化日期时间
 function dateFormat(fmt, date) {
     let ret;
@@ -131,24 +115,19 @@ function dateFormat(fmt, date) {
     };
     return fmt;
 }
-/*
-//滚动 -- fork from Suqing funny ---------------fixed
-// 自动滚动功能
-function AutoScroll(name) {
-    if (name) {
-        if ($(name).length != 0) {
-            let scrollTop = $(name)[0].scrollTop;
-            let scrollHeight = $(name)[0].scrollHeight;
-            let height = Math.ceil($(name).height());
-            if (scrollTop < scrollHeight - height) {
-                let add = (scrollHeight - height < 120) ? 1 : Math.ceil((scrollHeight - height) / 120);
-                $(name)[0].scrollTop = scrollTop + add;
-                setTimeout(function () {
-                    AutoScroll(name);
-                }, 1000 / 120);
-            }
+// 【2026-08-14 清理】原注释掉的 AutoScroll 旧实现已删除（智能滚动由 initObserver/smartAutoScroll 承担）
+
+// 【2026-08-12 移植作者 f45137e】修复聊天区点击玩家名查看玩家功能
+// 使用事件委托处理 cmd 属性（如 cmd='look3 <uid>'）
+$(document).on('click', '.container [cmd], .WG_log_log [cmd], .WG_log [cmd], .channel [cmd]', function (e) {
+    var cmd = $(this).attr('cmd');
+    if (cmd && cmd.indexOf('look3') === 0) {
+        if (typeof SendCommand === 'function') {
+            e.stopPropagation();
+            e.preventDefault();
+            SendCommand(cmd);
+            return false;
         }
     }
-}
-*/
+});
 

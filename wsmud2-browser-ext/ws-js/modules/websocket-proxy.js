@@ -1,226 +1,186 @@
-// websocket-proxy.js
-// WebSocket interception and message dispatch
+// ============================================================
+// websocket-proxy.js —— 劫持 WebSocket（扩展的核心机关）
+// ------------------------------------------------------------
+// 游戏和服务器之间靠 WebSocket 长连接通信（每一条指令/每一条消息都走它）。
+// 本文件做的事：
+//   1. 把浏览器的 WebSocket 换成一个"自己写的替身"
+//   2. 替身收到服务器的消息 → 先给插件看（交给 WG.receive_message 分发）
+//   3. 替身发送消息时 → 先检查：
+//        - $ 开头   → 走插件命令引擎 WG.SendCmd（比如 $to 扬州城）
+//        - @ 开头   → 走 Raid 引擎 ToRaid.perform（比如 @kill 木头人）
+//        - wk / backup / load → 特殊快捷指令
+//        - 其它     → 原样发给服务器
+//   4. 自带"命令排队"功能：一下子发很多命令时，自动限速（防刷屏被服务器踢）
+//
+// 通俗理解：插件在游戏门口装了个"安检门"，所有进出消息都要过一遍。
+// ============================================================
 'use strict';
 
-var show_msg;
-var CanUse = false;
-// 指数退避重连相关变量
-var reconnectAttempts = 0;
-var reconnectDelay = 500;
-var MAX_RECONNECT_ATTEMPTS = 20;
-var MAX_RECONNECT_DELAY = 60000;
-// 自动重登开关（从 config 读取）
-var autoReloadOnReconnectFail = true;
-
+var show_msg;        // 在游戏里显示一条文字消息（往聊天区打印）
+var CanUse = false;  // 当前浏览器是否支持 WebSocket
 if (WebSocket) {
     CanUse = true;
+    // 在游戏里显示一条消息（模拟服务器发来的文字消息）
     show_msg = function(msg) {
         ws_on_message({
             type: "text",
             data: msg
         });
     }
-    var _ws = WebSocket,
-        ws, ws_on_message;
+    var _ws = WebSocket,    // 保存"真 WebSocket"构造函数
+        ws,                 // 当前真正的 WebSocket 连接对象
+        ws_on_message;      // 游戏自己的"收到消息"处理函数
 
-    // 指数退避延迟序列（单位 ms）
-    var RECONNECT_DELAYS = [500, 2000, 5000, 10000, 30000, 60000];
-
-    // 指数退避重连函数
-    function scheduleReconnect() {
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-            // 重连失败流程
-            console.error('[websocket-proxy] 重连次数超过上限（20次），停止重连');
-            if (typeof Push !== 'undefined') {
-                Push('[wsmud插件] WebSocket重连失败，已尝试20次约13分钟，停止重连');
-            }
-            // 如果启用了自动重登，则刷新页面
-            if (autoReloadOnReconnectFail === true || autoReloadOnReconnectFail === 'true' || autoReloadOnReconnectFail === '开') {
-                console.log('[websocket-proxy] 触发自动刷新重登');
-                if (typeof Push !== 'undefined') {
-                    Push('[wsmud插件] 正在自动刷新页面重新登录...');
-                }
-                setTimeout(function () {
-                    location.reload();
-                }, 1000);
-            }
-            return;
-        }
-        var delayIndex = Math.min(reconnectAttempts, RECONNECT_DELAYS.length - 1);
-        var delay = RECONNECT_DELAYS[delayIndex];
-        reconnectAttempts++;
-        console.log('[websocket-proxy] 第 ' + reconnectAttempts + '/' + MAX_RECONNECT_ATTEMPTS + ' 次重连，等待 ' + (delay / 1000) + 's');
-        if (typeof Push !== 'undefined') {
-            Push('[wsmud插件] 连接断开，' + (delay / 1000) + '秒后第 ' + reconnectAttempts + ' 次重连');
-        }
-        setTimeout(function () {
-            // 检查连接是否已恢复（游戏可能已自行重连）
-            if (ws && ws.readyState == ws.OPEN) {
-                console.log('[websocket-proxy] 连接已恢复，重置重连状态');
-                reconnectAttempts = 0;
-                reconnectDelay = 500;
-                return;
-            }
-            // 发送心跳命令检查连接状态
-            if (typeof KEY !== 'undefined' && KEY.do_command) {
-                KEY.do_command("score");
-            }
-            // 继续下次重连
-            scheduleReconnect();
-        }, delay);
-    }
-
-    // 重置重连状态（连接成功时调用）
-    function resetReconnectState() {
-        reconnectAttempts = 0;
-        reconnectDelay = 500;
-    }
+    // ---- 命令队列（限速防刷）----
+    // 【2026-08-14 多连接防御】每个替身实例记住自己的真实连接（this._ws），
+    // 避免游戏创建多个连接时所有 send/close 都错发到"最后一个连接"；
+    // 全局 ws 仍指向最后创建的连接（插件内部 send_cmd 等逻辑不变）。
     unsafeWindow.WebSocket = function (uri) {
-        ws = new _ws(uri);
-        //document.getElementsByClassName("signinfo")[0].innerHTML = "<HIR>武神传说2插件正常运行</HIR>"
-        //$('.signinfo').on('click', function () {
-        //    ProConsole.init();
-        //});
+        var _inst = new _ws(uri);   // 替身内部其实还是用真的 WebSocket 连服务器
+        this._ws = _inst;
+        ws = _inst;
     };
+
+    // 替身的"原型"：把真的 WebSocket 的所有属性/方法都转发过去，只对关键的两个做手脚
     unsafeWindow.WebSocket.prototype = {
+        // 以下都是"转发"：游戏读这些属性时，返回真连接的值
         CONNECTING: _ws.CONNECTING,
         OPEN: _ws.OPEN,
         CLOSING: _ws.CLOSING,
         CLOSED: _ws.CLOSED,
-        get url() {
-            return ws.url;
-        },
-        get protocol() {
-            return ws.protocol;
-        },
-        get readyState() {
-            return ws.readyState;
-        },
-        get bufferedAmount() {
-            return ws.bufferedAmount;
-        },
-        get extensions() {
-            return ws.extensions;
-        },
-        get binaryType() {
-            return ws.binaryType;
-        },
-        set binaryType(t) {
-            ws.binaryType = t;
-        },
-        get onopen() {
-            return ws.onopen;
-        },
+        get url() { return (this._ws || ws).url; },
+        get protocol() { return (this._ws || ws).protocol; },
+        get readyState() { return (this._ws || ws).readyState; },
+        get bufferedAmount() { return (this._ws || ws).bufferedAmount; },
+        get extensions() { return (this._ws || ws).extensions; },
+        get binaryType() { return (this._ws || ws).binaryType; },
+        set binaryType(t) { (this._ws || ws).binaryType = t; },
+        get onopen() { return (this._ws || ws).onopen; },
         set onopen(fn) {
-            ws.onopen = function (e) {
-                resetReconnectState();
-                autoReloadOnReconnectFail = GM_getValue(roleid + "_auto_relogin_page", autoReloadOnReconnectFail);
-                fn(e);
+            // 【2026-08-22 修复】断线重连走的是"续连"：服务端通常不再重新下发 login 消息，
+            // 导致 GameState.connected 永远卡在 false（_scheduleRelogin 误判未连上、持续重试）。
+            // 在真实连接打开(onopen)时，把 connected/online 恢复为 true，解除此卡死。
+            (this._ws || ws).onopen = (e) => {
+                if (GameState) { GameState.connected = true; }
+                if (WG) { WG.online = true; }
+                try { _heartbeatStart(); } catch (eh) { }   // 连上 → 启动跨窗口心跳
+                if (typeof fn === "function") fn(e);
             };
         },
-        get onmessage() {
-            return ws.onmessage;
-        },
+
+        // ★ 关键点①：游戏给 WebSocket 设置"收到消息"处理函数时
+        //   我们把它偷偷换成 WG.receive_message，让插件先看消息
+        get onmessage() { return (this._ws || ws).onmessage; },
         set onmessage(fn) {
-            ws_on_message = fn;
-            ws.onmessage = WG.receive_message;
+            ws_on_message = fn;              // 记下游戏自己的处理函数
+            (this._ws || ws).onmessage = WG.receive_message;  // 但真正处理换成插件的
         },
-        get onclose() {
-            return ws.onclose;
-        },
+
+        // ★ 关键点②：断线时（onclose）做额外处理：
+        //   标记离线状态 + 如果开了"自动重连"，按指数退避自动重连（对齐 v1.0.0，
+        //   原版 10 秒+30 分钟两次定时器：重连太慢；现改为退避重试，避免固定 500ms 轰炸服务器）
+        get onclose() { return (this._ws || ws).onclose; },
         set onclose(fn) {
-            ws.onclose = (e) => {
-                WG.online = false;
+            (this._ws || ws).onclose = (e) => {
+                var wasConnected = GameState.connected;      // 断线前的状态（区分真断线 vs 重连失败）
+                WG.online = false;                           // 标记：离线了
                 GameState.connected = false;
-                auto_relogin = GM_getValue(roleid + "_auto_relogin", auto_relogin);
-                autoReloadOnReconnectFail = GM_getValue(roleid + "_auto_relogin_page", autoReloadOnReconnectFail);
-                fn(e);
-                if (auto_relogin == "开" || auto_relogin === true || auto_relogin === 'true') {
-                    // 使用指数退避替代固定定时重连
-                    reconnectAttempts = 0;
-                    reconnectDelay = 500;
-                    scheduleReconnect();
+                try { _heartbeatStop(); } catch (eh) { }     // 断开 → 停止心跳，该角色在汇总里自然过期
+                // 【2026-08-22 修复】被顶前先记录当前角色，供后续抢回定位（避免跳号到别处）
+                try { if (typeof unsafeWindow.__extRecordKickRole === 'function') unsafeWindow.__extRecordKickRole(); } catch (eh2) { }
+                auto_relogin = GM_getValue(roleid + "_auto_relogin", auto_relogin);  // 读自动重连设置
+                if (typeof fn === "function") fn(e);   // 先执行游戏自己的关闭处理
+                if (auto_relogin == "开" || auto_relogin === true || auto_relogin === 'true') {      // 开了自动重连 → 退避重试
+                    if (wasConnected) _reloginTry = 0;   // 真断线：从头开始退避；重连失败：间隔继续递增
+                    _scheduleRelogin();
                 }
             }
 
         },
-        get onerror() {
-            return ws.onerror;
-        },
-        set onerror(fn) {
-            ws.onerror = fn;
-        },
+        get onerror() { return (this._ws || ws).onerror; },
+        set onerror(fn) { (this._ws || ws).onerror = fn; },
+
+        // ★ 关键点③：游戏给服务器发消息时，先过插件这一关
         send: function (text) {
+            // 第一次发送时记录登录凭证（cookie）
             if (GameState.cookie == undefined) {
                 GameState.cookie = text;
             }
+            // 断线重连后，自动把凭证补回去（防止需要重新登录）
             if (text.indexOf(GameState.id) > -1 && !GameState.connected) {
                 text = GameState.cookie + ' ' + GameState.id
             }
+            // 开了"命令回显"时，把发出的命令打印到游戏聊天区（方便看发了啥）
             if (cmd_echo) {
                 const time = new Date().toLocaleTimeString();
                 show_msg('<hic>' + time + '</hic> <hiy>' + text + '</hiy>');
             }
+            // $ 开头 = 插件命令（如 $to 扬州城-武庙）→ 走 WG.SendCmd
             if (text[0] == "$") {
                 WG.SendCmd(text);
                 return;
             }
+            // @ 开头 = Raid 命令（如 @kill 木头人）→ 走 Raid 引擎
             if (text[0] == '@') {
                 if (unsafeWindow && unsafeWindow.ToRaid) {
                     ToRaid.perform(text);
                     return;
                 } else {
+                    // Raid 引擎没装上（不应该发生，因为本扩展自带）
                     messageAppend("插件未安装,请访问 https://greasyfork.org/zh-CN/scripts/375851-wsmud-raid 下载并安装");
-                    window.open("https://greasyfork.org/zh-CN/scripts/375851-wsmud-raid ", '_blank').location;
+                    // 【2026-08-15 修复】原 URL 末尾多一个空格、且多余 .location 链（无实际作用）
+                    window.open("https://greasyfork.org/zh-CN/scripts/375851-wsmud-raid", '_blank');
                 }
             }
 
+            // 几个特殊的快捷指令
             switch (text) {
-
-                case 'wk':
+                case 'wk':          // 输入 wk = 自动挖矿/修炼
                     WG.zdwk();
                     break;
-                case 'backup':
+                case 'backup':      // 输入 backup = 配置备份到云端
                     WG.make_config();
                     break;
-                case 'load':
+                case 'load':        // 输入 load = 从云端恢复配置
                     WG.load_config();
                     break;
-                default:
-                    ws.send(text);
+                default:            // 其它一律原样发给服务器
+                    (this._ws || ws).send(text);
                     break;
             }
         },
         close: function () {
-            ws.close();
+            (this._ws || ws).close();
         }
     };
 
-    var cmd_queue = [],
-        cmd_busy = false,
+    // ---- 命令队列（限速防刷）----
+    // 自动脚本可能一瞬间发很多命令（比如连续打坐、连续走动），
+    // 全部马上发给服务器会被当成刷屏踢下线，所以排队慢慢发。
+    var cmd_queue = [],   // 待发送的命令队列
+        cmd_busy = false, // 是否正在处理队列
         echo = false;
-    // 暴露命令队列供健康检查使用
-    window._getCmdQueue = function () { return cmd_queue; };
-    window._getCmdBusy = function () { return cmd_busy; };
-    // 命令队列处理函数
+    // 队列处理函数：一次最多发 5 条，每条之间隔 1.3 秒
     var _send_cmd = function () {
-        if (!ws || ws.readyState != 1) {
+        if (!ws || ws.readyState != 1) {   // 连接没了 → 清空队列
             cmd_busy = false;
             cmd_queue = []
         } else if (cmd_queue.length > 0) {
             cmd_busy = true;
             var t = new Date().getTime();
+            // 把排队超过 1.3 秒还没发的命令清理掉（太旧了就不发了）
             for (var i = 0; i < cmd_queue.length; i++) {
                 if (!cmd_queue[i].timestamp || cmd_queue[i].timestamp >= t - 1300) {
                     cmd_queue.splice(0, i);
                     break
                 }
             }
+            // 发前 5 条
             for (i = 0; i < Math.min(cmd_queue.length, 5); i++) {
                 if (!cmd_queue[i].timestamp) {
                     try {
                         ws.send(cmd_queue[i].cmd);
-                        cmd_queue[i].timestamp = t
+                        cmd_queue[i].timestamp = t   // 打上发送时间戳
                     } catch (e) {
                         cmd_busy = false;
                         cmd_queue = [];
@@ -228,6 +188,7 @@ if (WebSocket) {
                     }
                 }
             }
+            // 还有没发完的 → 100 毫秒后再来一轮；发完了 → 解锁
             if (!cmd_queue[cmd_queue.length - 1].timestamp) {
                 setTimeout(_send_cmd, 100)
             } else {
@@ -237,19 +198,20 @@ if (WebSocket) {
             cmd_busy = false
         }
     };
-    // 发送命令函数
+    // 发送命令函数（插件内部都用它发指令）
+    // cmd：可以是字符串（用 ; 分隔多条）或数组；no_queue=true 表示不等队直接发
     var send_cmd = function (cmd, no_queue) {
-        if (ws && ws.readyState == 1) {
-            cmd = Array.isArray(cmd) ? cmd : cmd.split(';');
-            if (no_queue) {
+        if (ws && ws.readyState == 1) {   // 连接正常才发
+            cmd = cmd instanceof Array ? cmd : cmd.split(';');
+            if (no_queue) {               // 直接发模式
                 for (var i = 0; i < cmd.length; i++) {
-                    if (cmd_echo || Coding) {
+                    if (cmd_echo || Coding) {   // 回显
                         const time = new Date().toLocaleTimeString();
                         show_msg('<hic>' + time + '</hic> <hiy>' + cmd[i] + '</hiy>');
                     }
                     ws.send(cmd[i])
                 }
-            } else {
+            } else {                      // 排队模式（默认）
                 for (i = 0; i < cmd.length; i++) {
                     cmd_queue.push({
                         cmd: cmd[i],
@@ -261,6 +223,12 @@ if (WebSocket) {
                 }
             }
         }
+    };
+
+    // 【2026-08-16】暴露"命令队列是否空闲"，供 Raid @zmlwait 阻塞自命令使用
+    // （自命令为命令串时，@zmlwait 会等队列清空再继续下一行流程）
+    unsafeWindow.__extCmdQueueIdle = function () {
+        return cmd_queue.length === 0 && !cmd_busy;
     };
 
 } else {
