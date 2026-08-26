@@ -27,7 +27,7 @@ const Dialog = {
             this.curItem = _t358;
             this[_t358].show(_t359);
             Process.message.scroll2end();
-        } else if (this[_t358] && this[_t358].isShow)
+        } else if (this[_t358])
             this[_t358].onData(_t359);
     },
     'select': function(_t361) {
