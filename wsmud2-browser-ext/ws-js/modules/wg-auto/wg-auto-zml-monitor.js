@@ -85,7 +85,7 @@ Object.assign(WG, {
     },
     zmlztjk: function () {
         if (WG._zmlLayerIndex) {
-            layer.close(WG._zmlLayerIndex);
+            WG._zmlClosePanel();
             return;
         }
         WG._zmlOpenView('main');

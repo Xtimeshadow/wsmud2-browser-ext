@@ -200,6 +200,7 @@ Object.assign(WG, {
     zml_showp: function () {
         $(".zdy-commands").empty();
         $('.act-item-zdy').remove();
+        zml = GM_getValue(roleid + "_zml", zml);
         zmlshowsetting = GM_getValue(roleid + "_zmlshowsetting", zmlshowsetting);
 
         for (let zmlitem of zml) {

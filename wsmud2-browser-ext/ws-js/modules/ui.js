@@ -130,20 +130,112 @@ var UI = {
     <br />
 </div>
 </div> `,
-    zmlandztjkui: `<div class='zdy_dialog' style='text-align:right;width:280px' id="zmlandztjk">
- <div class="item-commands"> <span class="editzml" @click="zml"> 编辑自命令 </span> </div>
- <div class="item-commands"> <span class="editztjk" @click="ztjk"> 编辑自定义监控 </span>
-     <div class="item-commands"> <span class="startzdjk" @click="startjk"> 注入所有监控 </span> <span class="stopzdjk"
-             @click="stopjk"> 暂停所有监控
-         </span>
-     </div>
- </div>
- <div class="item-commands" id="zml_show">
-             <span v-for="(item, index) in zmldata" @click="run(item)">
-                 {{item.name}}
-             </span>
- </div>
- </div>`, ztjksetting: `<div class='zdy_dialog' style='text-align:right;width:280px'>
+    zmlandztjkui: `<div class='zdy_dialog' id="zmlandztjk" style="height:100%;display:flex;flex-direction:column;font-size:13px;">
+
+  <!-- ==================== ZML 列表视图 ==================== -->
+  <div v-show="cv==='zmlList'" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+    <div style="font-weight:bold;color:#ccc;padding:4px 0;border-bottom:1px solid #555;margin-bottom:6px;">自命令列表</div>
+    <transition-group name="zml-flip" tag="div" style="flex:1;overflow-y:auto;">
+      <div v-for="(item, idx) in zmldata" :key="item._key" style="display:flex;align-items:center;padding:5px 4px;border-bottom:1px solid #333;cursor:default;">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;" :title="item.zmlRun">{{item.name}}</span>
+        <span class="zml-btn zml-btn-run" @click="runZml(item)">运行</span>
+        <span class="zml-btn zml-btn-edit" @click="editZml(item)">编辑</span>
+        <span :class="zmlShowBtnCls(item)" @click="toggleZmlShow(item)">{{zmlShowBtn(item)}}</span>
+        <div class="zml-move-wrap">
+          <span class="zml-btn zml-btn-move" :style="idx===0?{display:'none'}:{}" @click="moveZml(idx,-1)">上移</span>
+          <span class="zml-btn zml-btn-move" :style="idx===zmldata.length-1?{display:'none'}:{}" @click="moveZml(idx,1)">下移</span>
+        </div>
+      </div>
+    </transition-group>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-top:1px solid #555;margin-top:6px;">
+      <span class="zml-btn zml-btn-add" @click="addZml">+ 添加</span>
+      <span style="color:#888;font-size:12px;">共 {{zmldata.length}} 个自命令</span>
+    </div>
+    <div style="display:flex;gap:8px;padding:8px 4px;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-action" @click="openZtjkList">编辑自定义监控</span>
+      <span class="zml-btn zml-btn-action" @click="injectAll">注入所有监控</span>
+      <span class="zml-btn zml-btn-action" @click="stopAll">暂停所有监控</span>
+    </div>
+  </div>
+
+  <!-- ==================== ZML 编辑视图 ==================== -->
+  <div v-show="cv==='zmlEdit'" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+    <div style="font-weight:bold;color:#ccc;padding:4px 0;border-bottom:1px solid #555;margin-bottom:8px;">编辑自命令</div>
+    <div class="setting-item" style="margin-bottom:6px;">
+      <span><label for="zml_name" style="color:#ccc;">输入自定义命令名称:</label></span>
+      <span><input id="zml_name" style="width:120px;background:#14141f;border:1px solid #555;border-radius:4px;color:#ccc;padding:3px 6px;outline:none;" type="text" v-model="editForm.name"></span>
+    </div>
+    <div class="setting-item" style="margin-bottom:6px;">
+      <label for="zml_type" style="color:#ccc;">自命令类型：</label>
+      <select id="zml_type" style="width:100px;background:#14141f;border:1px solid #555;border-radius:4px;color:#ccc;padding:3px 4px;outline:none;" v-model="editForm.zmlType">
+        <option value="0">插件原生</option>
+        <option value="1">Raidjs流程</option>
+        <option value="2">JavaScript</option>
+      </select>
+    </div>
+    <div class="setting-item" style="margin-bottom:4px;">
+      <label for="zml_info" style="color:#ccc;">输入自定义命令(用半角分号(;)分隔):</label>
+    </div>
+    <div class="setting-item" style="flex:1;min-height:0;margin-bottom:8px;display:flex;">
+      <textarea id="zml_info" v-model="editForm.zmlRun" style="flex:1;width:100%;background:#14141f;border:1px solid #555;border-radius:4px;color:#ccc;padding:4px 6px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+    </div>
+    <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-edit" @click="getShareZml">查询分享</span>
+      <span class="zml-btn zml-btn-run" @click="saveZml">保存</span>
+      <span class="zml-btn" style="border-color:#f88;color:#f88;" @click="deleteZml">删除</span>
+    </div>
+    <div class="item-commands" style="padding:4px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-action" @click="backToZmlList">← 返回</span>
+    </div>
+  </div>
+
+  <!-- ==================== ZTJK 列表视图 ==================== -->
+  <div v-show="cv==='ztjkList'" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+    <div style="font-weight:bold;color:#ccc;padding:4px 0;border-bottom:1px solid #555;margin-bottom:6px;">自定义监控列表</div>
+    <transition-group name="zml-flip" tag="div" style="flex:1;overflow-y:auto;">
+      <div v-for="(item, idx) in ztjkdata" :key="item._key" style="display:flex;align-items:center;padding:5px 4px;border-bottom:1px solid #333;cursor:default;">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;font-size:12px;" :title="item.script">{{item.name}}</span>
+        <span :class="'zml-btn ' + (item.isactive?'zml-btn-quick':'zml-btn-quick-off')" @click="toggleZtjk(item)">{{item.isactive?'启用':'暂停'}}</span>
+        <span class="zml-btn zml-btn-edit" @click="editZtjk(item)">编辑</span>
+        <div class="zml-move-wrap">
+          <span class="zml-btn zml-btn-move" :style="idx===0?{display:'none'}:{}" @click="moveZtjk(idx,-1)">上移</span>
+          <span class="zml-btn zml-btn-move" :style="idx===ztjkdata.length-1?{display:'none'}:{}" @click="moveZtjk(idx,1)">下移</span>
+        </div>
+      </div>
+    </transition-group>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-top:1px solid #555;margin-top:6px;">
+      <span class="zml-btn zml-btn-add" @click="addZtjk">+ 添加</span>
+      <span style="color:#888;font-size:12px;">共 {{ztjkdata.length}} 个自定义监控</span>
+    </div>
+    <div style="padding:4px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-action" @click="backToZmlList">← 返回自命令</span>
+    </div>
+  </div>
+
+  <!-- ==================== ZTJK 编辑视图 ==================== -->
+  <div v-show="cv==='ztjkEdit'" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+    <div style="font-weight:bold;color:#ccc;padding:4px 0;border-bottom:1px solid #555;margin-bottom:8px;">编辑自定义监控</div>
+    <div class="setting-item" style="margin-bottom:6px;">
+      <label for="ztjk_name" style="color:#ccc;">监控名称:</label>
+      <input id="ztjk_name" style="width:150px;background:#14141f;border:1px solid #555;border-radius:4px;color:#ccc;padding:3px 6px;outline:none;" type="text" v-model="editZtjkForm.name">
+    </div>
+    <div class="setting-item" style="margin-bottom:4px;">
+      <label for="ztjk_script" style="color:#ccc;">监控脚本 (传入参数为 data, 可用全局变量 G, WG, T):</label>
+    </div>
+    <div class="setting-item" style="flex:1;min-height:0;margin-bottom:8px;display:flex;">
+      <textarea id="ztjk_script" v-model="editZtjkForm.script" style="flex:1;width:100%;background:#14141f;border:1px solid #555;border-radius:4px;color:#ccc;padding:4px 6px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+    </div>
+    <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-edit" @click="getShareZtjk">查询分享</span>
+      <span class="zml-btn zml-btn-run" @click="saveZtjk">保存</span>
+      <span class="zml-btn" style="border-color:#f88;color:#f88;" @click="deleteZtjk">删除</span>
+    </div>
+    <div class="item-commands" style="padding:4px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-action" @click="backToZtjkList">← 返回</span>
+    </div>
+  </div>
+
+</div>`, ztjksetting: `<div class='zdy_dialog' style='text-align:right;width:280px'>
 <div class="setting-item"> <label> 监控脚本引擎：在这里，你可以编写JS代码来处理任何游戏事件。</label></div>
 <div class="setting-item"> <label for="ztjk_name"> 监控名称:</label><input id="ztjk_name" style='width:150px' type="text"
         name="ztjk_name" value=""></div>
