@@ -261,7 +261,6 @@ Object.assign(WG, {
               }
           }
 
-          // 【2026-08-12 移植作者 f45137e】合并"你获得了"物品消息（扫荡副本时大量重复提示聚合为一条）
           if (data.type == 'text' && typeof data.msg == 'string' &&
               data.msg.indexOf('你获得了') === 0 &&
               data.msg.indexOf('点经验') === -1 &&
@@ -289,7 +288,7 @@ Object.assign(WG, {
                   }
                   clearTimeout(window._obtainedTimer);
                   window._obtainedTimer = setTimeout(function () {
-                      var parts = [];
+                      let parts = [];
                       // 先加入非金钱物品
                       if (window._obtainedItems && window._obtainedItems.length > 0) {
                           parts = window._obtainedItems.slice();

@@ -10,6 +10,43 @@
 // Rainbow name, smart scroll, date format, auto scroll
 'use strict';
 
+(function() {
+    'use strict';
+    GM_addStyle(`
+* {
+    scrollbar-width: auto !important;
+}
+/* 全局滚动条，作用于页面所有滚动容器 */
+::-webkit-scrollbar {
+    width: 10px !important;
+    height: 10px !important;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #555555 !important;
+    border-radius: 4px !important;
+}
+::-webkit-scrollbar-track {
+    background-color: #121212 !important;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color: #777777 !important;
+}
+/* Firefox全局滚动条配色兜底 */
+.channel, .settingbox.hide {
+    scrollbar-color: #555555 #121212 !important;
+}
+`);
+
+    // 监听，防止js动态抹除滚动条样式，覆盖目标容器
+    const obs = new MutationObserver(()=>{
+        document.querySelectorAll('.channel, .settingbox.hide').forEach(el=>{
+            el.style.scrollbarWidth = "auto";
+        });
+    });
+    obs.observe(document.body, {childList:true, subtree:true, attributes:true});
+})();
+
+
 // 全局变量，用于获取聊天窗口元素，避免重复查询
 var chatContainer = null;
 

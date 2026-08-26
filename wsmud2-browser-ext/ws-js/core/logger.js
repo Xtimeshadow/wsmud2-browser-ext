@@ -37,8 +37,8 @@ var ExtLog = {
         try { console.error.apply(console, [ExtLog._ts(), ExtLog.prefix].concat(Array.prototype.slice.call(arguments))); } catch (e) { }
     },
 
-    setEnabled: function (v) {
-        ExtLog.enabled = !!v;
+    setEnabled: function (enabled) {
+        ExtLog.enabled = enabled;
     }
 };
 
