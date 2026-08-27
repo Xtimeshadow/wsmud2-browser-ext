@@ -261,67 +261,108 @@ Object.assign(WG, {
               }
           }
 
-          if (data.type == 'text' && typeof data.msg == 'string' &&
+          const bl = data.type == 'text' && typeof data.msg == 'string' &&
               data.msg.indexOf('你获得了') === 0 &&
               data.msg.indexOf('点经验') === -1 &&
-              data.msg.indexOf('点潜能') === -1) {
-              const itemName = data.msg.replace(/^你获得了/, '').replace(/[。，,.\s]/g, '').trim();
-              if (itemName) {
-                  if (!window._obtainedItems) {
-                      window._obtainedItems = [];
-                      window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
-                  }
-                  // 检测是否为金钱物品（先剥离颜色标签）
-                  const cleanName = itemName.replace(/<[^>]+>/g, '');
-                  let moneyAmount = null, moneyType = null;
-                  const goldMatch = cleanName.match(/^(.+?)两黄金$/);
-                  const silverMatch = cleanName.match(/^(.+?)两银子$/);
-                  const copperMatch = cleanName.match(/^(.+?)文铜板$/) || cleanName.match(/^(.+?)铜板$/);
-                  if (goldMatch) { moneyAmount = chineseNumToInt(goldMatch[1]); moneyType = 'gold'; }
-                  else if (silverMatch) { moneyAmount = chineseNumToInt(silverMatch[1]); moneyType = 'silver'; }
-                  else if (copperMatch) { moneyAmount = chineseNumToInt(copperMatch[1]); moneyType = 'copper'; }
+              data.msg.indexOf('点潜能') === -1;
 
-                  if (moneyType) {
-                      window._obtainedMoney[moneyType] += moneyAmount;
-                  } else {
-                      window._obtainedItems.push(itemName);
-                  }
-                  clearTimeout(window._obtainedTimer);
-                  window._obtainedTimer = setTimeout(function () {
-                      let parts = [];
-                      // 先加入非金钱物品
-                      if (window._obtainedItems && window._obtainedItems.length > 0) {
-                          parts = window._obtainedItems.slice();
+          if (bl) {
+              const opened = merge_item_display == "开" || merge_item_display === true || merge_item_display === 'true';
+              if (opened) {
+                  const itemName = data.msg.replace(/^你获得了/, '').replace(/[。，,.\s]/g, '').trim();
+                  if (itemName) {
+                      if (!window._obtainedItems) {
+                          window._obtainedItems = {};
+                          window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
                       }
-                      // 换算金钱：100个铜板=1两银子，100两银子=1两黄金
-                      const money = window._obtainedMoney;
-                      if (money.copper >= 100) {
-                          money.silver += Math.floor(money.copper / 100);
-                          money.copper = money.copper % 100;
-                      }
-                      if (money.silver >= 100) {
-                          money.gold += Math.floor(money.silver / 100);
-                          money.silver = money.silver % 100;
-                      }
-                      // 将换算后的金钱追加到末尾
-                      if (money.gold > 0) parts.push(intToChineseNum(money.gold) + '两黄金');
-                      if (money.silver > 0) parts.push(intToChineseNum(money.silver) + '两银子');
-                      if (money.copper > 0) parts.push(intToChineseNum(money.copper) + '文铜板');
 
-                      if (parts.length > 0) {
-                          const merged = '你获得了' + parts.join('、') + '。';
-                          messageAppend('<hiw>' + merged + '</hiw>', 1);
+                      const cleanItemName = itemName.replace(/<[^>]+>/g, '');
+
+                      let moneyAmount = null, moneyType = null;
+                      const goldMatch = cleanItemName.match(/^(.+?)两黄金$/);
+                      const silverMatch = cleanItemName.match(/^(.+?)两银子$/);
+                      const copperMatch = cleanItemName.match(/^(.+?)(?:个)?铜板$/);
+
+                      if (goldMatch) {
+                          moneyAmount = chineseNumToInt(goldMatch[1]);
+                          moneyType = 'gold';
                       }
-                      window._obtainedItems = [];
-                      window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
-                  }, 500);
+                      else if (silverMatch) {
+                          moneyAmount = chineseNumToInt(silverMatch[1]);
+                          moneyType = 'silver';
+                      }
+                      else if (copperMatch) {
+                          moneyAmount = chineseNumToInt(copperMatch[1]);
+                          moneyType = 'copper';
+                      }
+
+                      // 解析失败，降级当做普通物品
+                      if(moneyType && !Number.isFinite(moneyAmount)){
+                          moneyType = null;
+                      }
+
+                      if (moneyType) {
+                          window._obtainedMoney[moneyType] += moneyAmount;
+                      } else {
+                          // 👉普通物品计数累加
+                          if(window._obtainedItems[itemName]){
+                              window._obtainedItems[itemName] += 1;
+                          }else{
+                              window._obtainedItems[itemName] = 1;
+                          }
+                      }
+
+                      clearTimeout(window._obtainedTimer);
+                      window._obtainedTimer = setTimeout(function () {
+                          const parts = [];
+
+                          // 👉遍历计数对象，拼接 带数量的物品文本
+                          for(const name in window._obtainedItems){
+                              const count = window._obtainedItems[name];
+                              if(count <= 1){
+                                  parts.push(name);
+                              }else{
+                                  // count>1，把物品前缀的“一”替换成对应中文数字
+                                  // name示例："一本基本暗器秘籍" → "二本基本暗器秘籍"
+                                  const displayName = name.replace(/^一/, intToChineseNum(count));
+                                  parts.push(displayName);
+                              }
+                          }
+
+                          // 货币使用副本换算
+                          const money = {...window._obtainedMoney};
+                          if (money.copper >= 100) {
+                              money.silver += Math.floor(money.copper / 100);
+                              money.copper = money.copper % 100;
+                          }
+                          if (money.silver >= 100) {
+                              money.gold += Math.floor(money.silver / 100);
+                              money.silver = money.silver % 100;
+                          }
+
+                          if (money.gold > 0) parts.push(intToChineseNum(money.gold) + '两黄金');
+                          if (money.silver > 0) parts.push(intToChineseNum(money.silver) + '两银子');
+                          if (money.copper > 0) parts.push(intToChineseNum(money.copper) + '个铜板');
+
+                          if (parts.length > 0) {
+                              const merged = '你获得了' + parts.join('、') + '。';
+                              messageAppend('<hiw>' + merged + '</hiw>', 1);
+                          }
+
+                          // 清空缓存
+                          window._obtainedItems = {};
+                          window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
+                      }, 100);
+                  }
+                  // 跳过原始消息显示，但保留 funny API
+                  if (unsafeWindow.funny && unsafeWindow.funny.API) {
+                      unsafeWindow.funny.API.onmessage(msg);
+                  }
+                  return;
               }
-              // 跳过原始消息显示，但保留 funny API
-              if (unsafeWindow.funny && unsafeWindow.funny.API) {
-                  unsafeWindow.funny.API.onmessage(msg);
-              }
-              return;
+              // 不集中显示时，让原始消息正常显示（走到 ws_on_message）
           }
+
 
           ws_on_message.apply(this, arguments);
 

@@ -26,6 +26,9 @@
         $(".content-message").after(html);
         $('.content-bottom').after("<div class='zdy-commands' style='font-size:0.9em'></div>");
 
+        window.role = role;
+        window.roleid = roleid;
+
         // 注入核心样式
         GM_addStyle(_getZdyItemCSS());
         GM_addStyle(_getCodeFontCSS());
@@ -63,8 +66,6 @@
                 }
             } catch (e) { }
 
-            window.role = role;
-            window.roleid = roleid;
             document.title = role + "-MUD游戏-武神传说";
             LayerHelper.msg(`欢迎使用，版本号${GM_info.script.version || ''}`);
 

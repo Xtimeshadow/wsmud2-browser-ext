@@ -144,6 +144,7 @@ var _hcWarnedDom = false;        // DOM 超限是否已提示（防止每 5 分�
 var _hcWarnedStorage = false;    // 存储超限是否已提示
 // 获得物品展示设置
 var getitemShow = "开";
+var merge_item_display = "开";
 var itemTotalCount = {};
 var raidItemData = {};
 var zmlshowsetting = 0;

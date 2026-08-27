@@ -126,11 +126,13 @@ window.__funny2_settings = {
 
         function getVal(key) {
             try { var v = unsafeWindow.GM_getValue(key); if (v !== undefined && v !== null) return v; } catch(e) {}
-            return localStorage.getItem(key);
+            var stored = localStorage.getItem(key);
+            if (!stored) return undefined;
+            try { return JSON.parse(stored); } catch(e) { return stored; }
         }
         function setVal(key, val) {
             try { unsafeWindow.GM_setValue(key, val); } catch(e) {}
-            localStorage.setItem(key, val);
+            localStorage.setItem(key, JSON.stringify(val));
         }
 
         // ---- 开关初始化 ----

@@ -83,6 +83,7 @@ var GlobalInit = {
         auto_recover = GM_getValue(roleid + "_auto_recover", auto_recover);
         rainbow_name = GM_getValue(roleid + "_rainbow_name", rainbow_name);
         getitemShow = GM_getValue(roleid + "_getitemShow", getitemShow);
+        merge_item_display = GM_getValue(roleid + "_merge_item_display", merge_item_display);
         zml = GM_getValue(roleid + "_zml", zml);
         ztjk_item = GM_getValue(roleid + "_ztjk", ztjk_item);
         auto_command = GM_getValue(roleid + "_auto_command", auto_command);

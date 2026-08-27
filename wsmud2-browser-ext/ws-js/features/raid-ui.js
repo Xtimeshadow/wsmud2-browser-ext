@@ -740,17 +740,61 @@ const RaidUI = {
                 '<td style="padding:2px 8px;text-align:left">' + item.unit + '</td>' +
                 '</tr>';
         }
-        var content = '<div style="max-height:60vh;overflow-y:auto">' +
-            '<table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
-            '<thead><tr style="border-bottom:1px solid #555">' +
-            '<th style="padding:4px 8px;text-align:left">物品名</th>' +
-            '<th style="padding:4px 8px;text-align:right">获得数量</th>' +
-            '<th style="padding:4px 8px;text-align:right">当前持有</th>' +
-            '<th style="padding:4px 8px;text-align:left">单位</th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
-            '<div class="item-commands" style="text-align:center;margin-top:8px">' +
-            '<span class="getitem" style="width:80px">清空</span></div>';
-        RaidUI._appendHtml("<hig>获得物品</hig>", content);
+        // 清空WG_log，然后直接操作DOM构建flex布局
+        // 保存滚动位置，防止刷新时跳到顶部
+        var savedScrollTop = 0;
+        var oldScrollEl = document.querySelector('.raid-itemlog-scroll');
+        if (oldScrollEl) savedScrollTop = oldScrollEl.scrollTop;
+        Message.clean();
+        var wg_log = document.querySelector('.WG_log');
+        var pre = wg_log ? wg_log.querySelector('pre') : null;
+        if (!wg_log || !pre) return;
+        // 禁用WG_log自身滚动，防止嵌套滚动条
+        wg_log.style.setProperty('overflow-y', 'hidden', 'important');
+        wg_log.style.setProperty('overflow', 'hidden', 'important');
+        // pre设置为flex容器，撑满父容器
+        pre.style.setProperty('display', 'flex', 'important');
+        pre.style.setProperty('flex-direction', 'column', 'important');
+        pre.style.setProperty('height', '100%', 'important');
+        pre.style.setProperty('overflow', 'hidden', 'important');
+        pre.style.setProperty('margin', '0', 'important');
+        pre.style.setProperty('white-space', 'pre-line', 'important');
+        // 强制滚动条可见（覆盖全局 ::-webkit-scrollbar { display:none }）
+        var styleId = 'raid-itemlog-style';
+        var oldStyle = document.getElementById(styleId);
+        if (oldStyle) oldStyle.remove();
+        var styleTag = document.createElement('style');
+        styleTag.id = styleId;
+        styleTag.textContent =
+            '.raid-itemlog-scroll::-webkit-scrollbar { display: block !important; width: 8px !important; }' +
+            '.raid-itemlog-scroll::-webkit-scrollbar-thumb { background-color: #555 !important; border-radius: 4px !important; }' +
+            '.raid-itemlog-scroll::-webkit-scrollbar-track { background-color: #121212 !important; }';
+        document.head.appendChild(styleTag);
+        // 构建内容：标题栏 + 可滚动表格区域 + 固定底部按钮
+        pre.innerHTML =
+            '<div class="item-commands" style="flex:0 0 auto;text-align:center;">' +
+            '  <div style="margin-top:0.5em">' +
+            '    <div style="width:calc(100% - 4em);float:left;text-align:center;height:1.23em"><hig>获得物品</hig></div>' +
+            '  </div>' +
+            '</div>' +
+            '<br>' +
+            '<div class="raid-itemlog-scroll" style="flex:1;min-height:0;overflow-y:auto;padding-right:4px;">' +
+            '  <table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
+            '    <thead><tr style="border-bottom:1px solid #555">' +
+            '      <th style="padding:4px 8px;text-align:left">物品名</th>' +
+            '      <th style="padding:4px 8px;text-align:right">获得数量</th>' +
+            '      <th style="padding:4px 8px;text-align:right">当前持有</th>' +
+            '      <th style="padding:4px 8px;text-align:left">单位</th>' +
+            '    </tr></thead><tbody>' + rows + '</tbody></table>' +
+            '</div>' +
+            '<div class="item-commands" style="flex:0 0 auto;text-align:center;padding-top:8px;border-top:1px solid #555;margin-top:8px">' +
+            '  <span class="getitem" style="width:120px;display:inline-block">清空获得物品</span>' +
+            '</div>';
+        // 恢复滚动位置
+        var newScrollEl = document.querySelector('.raid-itemlog-scroll');
+        if (newScrollEl && savedScrollTop > 0) {
+            newScrollEl.scrollTop = savedScrollTop;
+        }
         $(".getitem").on("click", function () {
             for (var key in raidItemData) {
                 delete raidItemData[key];
@@ -967,6 +1011,22 @@ const RaidUI = {
         </div>`;
         // 【2026-08-08 按用户选择：方案A】Raid 弹窗内容仍写回日志区 .WG_log pre（原版行为），
         // 只把 Raid 工具栏搬到左侧（见 4258 行附近）。如以后想把弹窗也移左侧，改这里即可。
+        // 【2026-08-27 还原】切换tab时重置WG_log的overflow，让非物品日志页恢复原样
+        var wg_log = document.querySelector('.WG_log');
+        if (wg_log) {
+            wg_log.style.removeProperty('overflow-y');
+            wg_log.style.removeProperty('overflow');
+        }
+        var pre = wg_log ? wg_log.querySelector('pre') : null;
+        if (pre) {
+            pre.style.removeProperty('display');
+            pre.style.removeProperty('flex-direction');
+            pre.style.removeProperty('height');
+            pre.style.removeProperty('overflow');
+            pre.style.removeProperty('white-space');
+        }
+        var itemlogStyle = document.getElementById('raid-itemlog-style');
+        if (itemlogStyle) itemlogStyle.remove();
         Message.clean();
         Message.append(html, 2);
         $("#wsmud_raid_left").on('click', function () {
