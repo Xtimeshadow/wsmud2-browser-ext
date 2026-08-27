@@ -211,7 +211,8 @@
     const FUNNY2_INSERT_INDEX = 56;
 
     let extensionEnabled = true;  // 插件总开关（popup 里可以关）
-    let loadFunny2 = true;        // 是否加载 funny2.js（界面增强脚本，popup 里可以关）
+    let loadFunny2 = true;         // funny2 脚本开关
+    let selectedTheme = "master";  // 界面主题：master 或 fork
     const scriptLoadErrors = [];  // 【2026-08-14】记录加载失败的脚本，全部加载完后在游戏日志区提示
 
     // 按顺序加载自定义脚本（并行抓取 + 按插入顺序执行）
@@ -233,6 +234,10 @@
                 "ws-js/features/funny2-layout.js",
                 "ws-js/features/funny2-auto.js"
             );
+        }
+        // 主题脚本：在 funny2 布局之后加载
+        if (selectedTheme === "fork") {
+            scriptFiles.push("ws-js/themes/theme-fork.js");
         }
 
         // 【2026-08-17】确保版本号已设置（在加载 GM_API.js 之前）
@@ -388,7 +393,14 @@
             return;
         }
 
-        // ③ 导出配置（popup 点"导出"时触发）：把游戏 localStorage 全部打包成 JSON
+        // ③ 更新主题设置（popup 里切换主题时触发，或 storage 变化时跨标签页同步）
+        if (message.action === 'updateTheme') {
+            applyTheme(message.theme || 'master');
+            sendResponse({ success: true });
+            return;
+        }
+
+        // ④ 导出配置（popup 点"导出"时触发）：把游戏 localStorage 全部打包成 JSON
         if (message.action === 'GM_export') {
             try {
                 const data = {};
@@ -406,7 +418,7 @@
             return true;
         }
 
-        // ④ 导入配置（popup 点"导入"时触发）：把 JSON 写回游戏 localStorage
+        // ⑤ 导入配置（popup 点"导入"时触发）：把 JSON 写回游戏 localStorage
         // 【2026-08-14 安全警示】配置里可能包含"可执行/自动操作"的键（登录后执行命令、自命令、
         // 触发器、定时任务、扩展脚本等）——导入别人给的配置 = 可能执行别人的命令。
         // 检测到这类键且未确认（force 标记）时不写入，要求用户确认来源后重发。
@@ -445,9 +457,10 @@
     // 初始化
     // ---------------------------------------------------------------------------
     // 从扩展存储里读出上次的开关状态（popup 里设置的），然后开始加载脚本
-    chrome.storage.local.get(["extensionEnabled", "loadFunny2"], (result) => {
+    chrome.storage.local.get(["extensionEnabled", "loadFunny2", "selectedTheme"], (result) => {
         extensionEnabled = result.extensionEnabled !== false;   // 默认开
         loadFunny2 = result.loadFunny2 !== false;               // 默认开
+        selectedTheme = result.selectedTheme || "master";       // 默认 master
 
         const startLoading = () => {
             loadScriptsInOrder()
@@ -477,6 +490,28 @@
             document.addEventListener("DOMContentLoaded", startLoading);
         } else {
             startLoading();
+        }
+    });
+
+    // 主题切换通用函数（供 message handler 和 storage.onChanged 共用）
+    var _lastTheme = null;
+    function applyTheme(theme) {
+        theme = theme || 'master';
+        if (theme === _lastTheme) return; // 防重复（当前标签页会收到 message + storage 两次）
+        _lastTheme = theme;
+        selectedTheme = theme;
+        console.log('selectedTheme set to', selectedTheme);
+        localStorage.setItem('wsmud_theme', selectedTheme);
+        window.postMessage({ __EXT_BRIDGE__: true, action: 'themeChanged', theme: selectedTheme }, '*');
+        if (selectedTheme === 'fork') {
+            loadScript(chrome.runtime.getURL('ws-js/themes/theme-fork.js'));
+        }
+    }
+
+    // 监听 storage 变化：popup 在任意标签页中切换主题时，所有标签页同步生效
+    chrome.storage.onChanged.addListener(function (changes) {
+        if (changes.selectedTheme) {
+            applyTheme(changes.selectedTheme.newValue || 'master');
         }
     });
 

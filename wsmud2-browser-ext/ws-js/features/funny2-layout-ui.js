@@ -140,7 +140,8 @@ window.__funny2_layout = window.__funny2_layout || {};
             ),
             $("<div></div>").append(
                 $('<hiz class="span-btn"></hiz>').append("衙门").click(function () { SendCommand('$to 扬州城-衙门正厅'); }),
-                $('<hiz class="span-btn"></hiz>').append("花园").click(function () { SendCommand('$to 住房-小花园'); })
+                $('<hiz class="span-btn"></hiz>').append("花园").click(function () { SendCommand('$to 住房-小花园'); }),
+                $('<hiz class="span-btn"></hiz>').append("练功").click(function () { SendCommand('$to 住房-练功房'); })
             ),
             $("<div></div>").append(
                 $('<hio class="span-btn"></hio>').append("隐藏").click(hideLeftRight),

@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const toggleSwitch = document.getElementById("toggleSwitch");   // 插件总开关
     const statusEl = document.getElementById("status");             // 状态文字
     const funny2Switch = document.getElementById("funny2Switch");   // funny2 开关
+    const themeSwitch = document.getElementById("themeSwitch");     // 主题开关
+    const themeLabel = document.getElementById("themeLabel");       // 主题标签
     const exportBtn = document.getElementById("exportBtn");         // 导出按钮
     const importBtn = document.getElementById("importBtn");         // 导入按钮
     const importInput = document.getElementById("importInput");     // 隐藏的文件选择框
@@ -51,16 +53,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ---- 初始化：从扩展存储里读出上次的开关状态，回填到界面上 ----
-    chrome.storage.local.get(["extensionEnabled", "loadFunny2"], (result) => {
+    chrome.storage.local.get(["extensionEnabled", "loadFunny2", "selectedTheme"], (result) => {
         result = result || {};
         const enabled = result.extensionEnabled !== false;    // 没存过就当"开"
         const loadFunny2 = result.loadFunny2 === undefined ? true : !!result.loadFunny2;
+        const theme = result.selectedTheme || "master";
 
         toggleSwitch.checked = enabled;       // 开关位置
         updateStatusText(enabled);            // 状态文字
 
         if (funny2Switch) {
             funny2Switch.checked = loadFunny2;
+        }
+
+        // 主题开关
+        if (themeSwitch) {
+            themeSwitch.checked = (theme === "fork");
+            themeLabel.textContent = theme === "fork" ? "主题2" : "主题1";
         }
     });
 
@@ -99,6 +108,17 @@ document.addEventListener("DOMContentLoaded", () => {
                             : "已保存 funny2 开关（关闭后需刷新游戏页才完全生效）。");
                     }
                 });
+            });
+        });
+    }
+
+    // ---- theme 主题开关：切换时保存状态，并通知游戏页面 ----
+    if (themeSwitch) {
+        themeSwitch.addEventListener("change", () => {
+            const theme = themeSwitch.checked ? "fork" : "master";
+            chrome.storage.local.set({ selectedTheme: theme }, () => {
+                themeLabel.textContent = theme === "fork" ? "主题2" : "主题1";
+                sendMessageToActiveTab({ action: "updateTheme", theme });
             });
         });
     }

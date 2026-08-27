@@ -164,9 +164,6 @@ const Process = {
                 }, {
                     'cmd': 'liaoshang',
                     'name': '疗伤'
-                }, {
-                    'cmd': '#msg <hio>ID已获取：</hio><hiy>@id</hiy>',
-                    'name': '查看ID'
                 }];
                 if (Dialog.team.items && Dialog.team.items.length) {
                     _a5.push({
