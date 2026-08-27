@@ -265,18 +265,18 @@ Object.assign(WG, {
               data.msg.indexOf('你获得了') === 0 &&
               data.msg.indexOf('点经验') === -1 &&
               data.msg.indexOf('点潜能') === -1) {
-              var itemName = data.msg.replace(/^你获得了/, '').replace(/[。，,.\s]/g, '').trim();
+              const itemName = data.msg.replace(/^你获得了/, '').replace(/[。，,.\s]/g, '').trim();
               if (itemName) {
                   if (!window._obtainedItems) {
                       window._obtainedItems = [];
                       window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
                   }
                   // 检测是否为金钱物品（先剥离颜色标签）
-                  var cleanName = itemName.replace(/<[^>]+>/g, '');
-                  var moneyAmount = null, moneyType = null;
-                  var goldMatch = cleanName.match(/^(.+?)两黄金$/);
-                  var silverMatch = cleanName.match(/^(.+?)两银子$/);
-                  var copperMatch = cleanName.match(/^(.+?)文铜板$/) || cleanName.match(/^(.+?)铜板$/);
+                  const cleanName = itemName.replace(/<[^>]+>/g, '');
+                  let moneyAmount = null, moneyType = null;
+                  const goldMatch = cleanName.match(/^(.+?)两黄金$/);
+                  const silverMatch = cleanName.match(/^(.+?)两银子$/);
+                  const copperMatch = cleanName.match(/^(.+?)文铜板$/) || cleanName.match(/^(.+?)铜板$/);
                   if (goldMatch) { moneyAmount = chineseNumToInt(goldMatch[1]); moneyType = 'gold'; }
                   else if (silverMatch) { moneyAmount = chineseNumToInt(silverMatch[1]); moneyType = 'silver'; }
                   else if (copperMatch) { moneyAmount = chineseNumToInt(copperMatch[1]); moneyType = 'copper'; }
@@ -293,8 +293,8 @@ Object.assign(WG, {
                       if (window._obtainedItems && window._obtainedItems.length > 0) {
                           parts = window._obtainedItems.slice();
                       }
-                      // 换算金钱：100铜板=1两银子，100两银子=1两黄金
-                      var money = window._obtainedMoney;
+                      // 换算金钱：100个铜板=1两银子，100两银子=1两黄金
+                      const money = window._obtainedMoney;
                       if (money.copper >= 100) {
                           money.silver += Math.floor(money.copper / 100);
                           money.copper = money.copper % 100;
@@ -309,7 +309,7 @@ Object.assign(WG, {
                       if (money.copper > 0) parts.push(intToChineseNum(money.copper) + '文铜板');
 
                       if (parts.length > 0) {
-                          var merged = '你获得了' + parts.join('、') + '。';
+                          const merged = '你获得了' + parts.join('、') + '。';
                           messageAppend('<hiw>' + merged + '</hiw>', 1);
                       }
                       window._obtainedItems = [];

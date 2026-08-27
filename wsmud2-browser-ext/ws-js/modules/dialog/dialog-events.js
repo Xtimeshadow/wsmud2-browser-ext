@@ -47,8 +47,8 @@ Dialog.events = {
             this.element.appendTo(Dialog.contentElement);
         }
         let _a85 = [];
-        for (let _n129 = 0; _n129 < this.items.length; _n129++) {
-            const [_t920,_t921,_t922,_t923,_t924,_t925] = this.items[_n129];
+        for (let i = 0; i < this.items.length; i++) {
+            const [_t920,_t921,_t922,_t923,_t924,_t925] = this.items[i];
             _a85.push("<div class='event-item flex-row ");
             _a85.push("grade", _t923);
             _a85.push("'><div class='flex-1'><h3>");
@@ -67,10 +67,12 @@ Dialog.events = {
             _a85.push('</span>');
             _a85.push('</div>');
         }
-        if (!_a85.length)
+        if (!_a85.length) {
             _a85.push("<div class=\"empty\">暂无活动</div>");
+        }
         this.element.html(_a85.join(''));
-        Dialog.footer("<span class=\"obj-money\">共有" + this.items.length + ("项活动正在进行</span>"));
+        if (this.isShow)
+            Dialog.footer("<span class=\"obj-money\">共有" + this.items.length + ("项活动正在进行</span>"));
     },
     'format_time': function(_t926) {
         let _t928 = new Date(_t926)

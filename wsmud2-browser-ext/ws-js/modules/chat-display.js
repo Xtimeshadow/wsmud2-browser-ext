@@ -148,16 +148,14 @@ function dateFormat(fmt, date) {
         ret = new RegExp("(" + k + ")").exec(fmt);
         if (ret) {
             fmt = fmt.replace(ret[1], (ret[1].length == 1) ? (opt[k]) : (opt[k].padStart(ret[1].length, "0")))
-        };
-    };
+        }
+    }
     return fmt;
 }
-// 【2026-08-14 清理】原注释掉的 AutoScroll 旧实现已删除（智能滚动由 initObserver/smartAutoScroll 承担）
 
-// 【2026-08-12 移植作者 f45137e】修复聊天区点击玩家名查看玩家功能
 // 使用事件委托处理 cmd 属性（如 cmd='look3 <uid>'）
 $(document).on('click', '.container [cmd], .WG_log_log [cmd], .WG_log [cmd], .channel [cmd]', function (e) {
-    var cmd = $(this).attr('cmd');
+    const cmd = $(this).attr('cmd');
     if (cmd && cmd.indexOf('look3') === 0) {
         if (typeof SendCommand === 'function') {
             e.stopPropagation();
