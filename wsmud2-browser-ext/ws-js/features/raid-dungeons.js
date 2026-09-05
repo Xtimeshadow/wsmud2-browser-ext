@@ -94,7 +94,7 @@
         const executor = new AtCmdExecutor("fb", function (performer, param) {
             const name = AutoDungeonName(param);
             if (name == null) {
-                Message.append('暂不支持次副本哦，欢迎到论坛分享此副本流程。');
+                WMsg.append('暂不支持次副本哦，欢迎到论坛分享此副本流程。');
             } else {
                 const source = GetDungeonSource(name);
                 return new Promise(resolve => {

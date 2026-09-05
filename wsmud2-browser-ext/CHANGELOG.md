@@ -1,5 +1,29 @@
 # CHANGELOG — 武神传说扩展 v26.1.x
 
+## 26.5.0（2026-09-05）
+- 🆕 **适配新版客户端 wsmud2.cn/new.html（双模式）**（`content.js`/新增 `ws-js/core/newclient-shim.js`）：
+  - **背景**：新站 `/new.html` 的 `<body>` 为空，UI 由 `dist_new/ws.js`（ES Module 重写版客户端）运行时动态生成；
+    扩展需**挂载到新客户端之上**，而不是把它改回旧架构。
+  - **双模式实现**（`content.js`）：检测到 `dist_new` 客户端（新模式）时，跳过扩展的"客户端核心"文件
+    （ws-utils/ws-client/ws-map/ws-combat/ws-process/ws/login-core/login-methods/wslogin/
+    dialog 面板/wg-setting/wg-confirm/extension-manager），只注入增强模块（自动战斗/Raid/触发器/funny2 等）；
+    旧站（wsmud2.com / wsmud2.cn/）行为完全不变。
+  - **新模式不跳过的关键文件**：`state.js`（GameState）与 `raid-role.js`（Role/Room）必须保留——
+    扩展大量模块加载时就引用全局 GameState/Role/Room，跳过会 ReferenceError，甚至导致登录握手崩溃。
+  - **全局冲突处理**：Raid/Trigger 的 `Message` 日志助手改名 `WMsg`（防被新客户端同名全局覆盖，
+    影响 raid-tools/raid-role/raid-commands/raid-system/raid-executor/raid-compiler/raid-dungeons/
+    raid-server/raid-th/raid-ui/trigger-ui/trigger-ui-form）；funny2 的 `SendCommand`
+    包装改名 `f2SendCommand`（新模式不再覆盖 window.SendCommand）；`Raid.js` 新模式不覆盖 window.Role
+    但照常 `Role.init()`（登录钩子创建工具栏）；`proto-ext.js` 仅在无原生时补 `String.prototype.replaceAll`。
+  - **新客户端 Dialog 懒初始化缺陷修复**（新增 `ws-js/core/newclient-shim.js`，新模式首位加载）：
+    新客户端 `Dialog.show(name, data)` 直接处理数据时若面板元素（this.element）未创建会抛
+    "Cannot read properties of undefined (reading 'html')"；扩展直接发 events/relation 等命令返回的
+    dialog 数据即触发。补丁拦截 Process.dialog / Dialog.show：先初始化基础 Dialog、再调面板 show()
+    建元素、无 show() 的面板补占位元素，并记录 data-ext-last-dialog 诊断标记。
+  - **已实测**（测试账号 1482035785）：新模式登录正常（不再卡"正在连接服务器"）；活动/技能/背包等
+    游戏自带按钮正常；Raid 工具栏（快捷/功能/触发/流程/副本/命令/获得物品/自命令）正常显示；
+    扩展日志/延迟测试/挖矿挂机正常；对话框报错消除；162 个 JS 全过语法检查。
+
 ## 26.3.11（2026-08-24）
 - 🎒 **`@tidyBag` 增强为一键整理包裹**（`Raid.js`/`wg-combat.js`）：固定顺序
   `stopstate → 自动使用(autoUseList) → 分解(fenjieList，含随从) → 清单售卖(autoSellList) → 卖光剩余 sell all → 存仓 store all`，

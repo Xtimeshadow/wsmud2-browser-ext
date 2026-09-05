@@ -135,7 +135,7 @@
         const executor = new CmdExecutor(cmd => {
             return cmd.indexOf("<-recordGains") == 0;
         }, (performer, _) => {
-            if (performer.log()) Message.cmdLog("开始记录物品获取");
+            if (performer.log()) WMsg.cmdLog("开始记录物品获取");
             __RecordGainsFrom = new Date().getTime();
         })
         CmdExecuteCenter.addExecutor(executor);
@@ -155,14 +155,14 @@
             });
             var content = "";
             if (cmd.indexOf("recordGains->silent") == -1) {
-                Message.clean();
-                Message.append("&nbsp;&nbsp;> 战利品列表如下：");
+                WMsg.clean();
+                WMsg.append("&nbsp;&nbsp;> 战利品列表如下：");
             }
             for (const name in result) {
                 if (!result.hasOwnProperty(name)) continue;
                 const gain = result[name];
                 if (cmd.indexOf("recordGains->silent") == -1) {
-                    Message.append("&nbsp;&nbsp;* " + name + " " + gain.count + gain.unit);
+                    WMsg.append("&nbsp;&nbsp;* " + name + " " + gain.count + gain.unit);
                 }
                 content += `&nbsp;&nbsp;* ${name} ${gain.count}${gain.unit}<br>`;
             }
@@ -627,7 +627,7 @@
 
     (function () {
         const executor = new AtCmdExecutor("cleanBag", function (performer, param) {
-            if (performer.log()) Message.cmdLog("清理包裹");
+            if (performer.log()) WMsg.cmdLog("清理包裹");
             return UntilRoleFreePerformerPromise(resolve => {
                 WG.SendCmd("sell all");
                 setTimeout(resolve, 1000);
@@ -642,25 +642,25 @@
         // 使用/分解/清单售卖均做"阻塞"（轮询物品用尽/角色空闲），确保上一步完成后再进入下一步。
         const executor = new AtCmdExecutor("tidyBag", function (performer, param) {
             // 分步进度提示（始终显示，不受 performer.log 开关限制）
-            const step = function (m) { Message.cmdLog(m); };
-            Message.cmdLog("整理包裹开始");
+            const step = function (m) { WMsg.cmdLog(m); };
+            WMsg.cmdLog("整理包裹开始");
             return new Promise(function (resolve) {
                 // 0) 先 stopstate 停掉当前动作，避免与新指令冲突
                 WG.SendCmd("stopstate");
                 setTimeout(function () {
                     // 1) 自动使用（阻塞）
-                    Message.cmdLog("[1/4] 自动使用物品");
+                    WMsg.cmdLog("[1/4] 自动使用物品");
                     WG.tidyBlockUse(step).then(function () {
                         // 2) 分解（阻塞）
-                        Message.cmdLog("[2/4] 分解装备");
+                        WMsg.cmdLog("[2/4] 分解装备");
                         WG.tidyBlockFenjie(step).then(function () {
                             // 3) 按 autoSellList 清单售卖（阻塞）
-                            Message.cmdLog("[3/4] 按清单售卖");
+                            WMsg.cmdLog("[3/4] 按清单售卖");
                             WG.tidyBlockSell(step).then(function () {
                                 // 4) 卖光剩余 + 存仓
-                                Message.cmdLog("[4/4] 卖光剩余并存入仓库");
+                                WMsg.cmdLog("[4/4] 卖光剩余并存入仓库");
                                 WG.SendCmd("sell all;store all");
-                                setTimeout(function () { Message.cmdLog("整理包裹完成"); resolve(); }, 1000);
+                                setTimeout(function () { WMsg.cmdLog("整理包裹完成"); resolve(); }, 1000);
                             });
                         });
                     });
@@ -673,7 +673,7 @@
 
     (function () {
         const executor = new AtCmdExecutor("renew", function (performer, param) {
-            if (performer.log()) Message.cmdLog("恢复角色气血和内力");
+            if (performer.log()) WMsg.cmdLog("恢复角色气血和内力");
             return UntilRoleFreePerformerPromise(resolve => {
                 Role.renew(_ => { setTimeout(resolve, 1000); });
             });
@@ -799,7 +799,7 @@
                 var wa = createWorker("setTimeout(() =>  postMessage('0'), " + delay + ")")
                 wa.onmessage = function (event) {
                     wa.terminate();
-                    if (performer.log()) Message.cmdLog("执行系统命令", validCmd);
+                    if (performer.log()) WMsg.cmdLog("执行系统命令", validCmd);
                     performer.timeSeries(timestamp);
                     performer.systemCmdTimestamp = timestamp;
                     WG.SendCmd(validCmd);
@@ -814,7 +814,7 @@
     (function () {
         const executor = new AtCmdExecutor("force", function (performer, param) {
             return new Promise(resolve => {
-                if (performer.log()) Message.cmdLog("强行执行系统命令", param);
+                if (performer.log()) WMsg.cmdLog("强行执行系统命令", param);
                 WG.SendCmd(param);
                 const cmdDelay = performer._cmdDelay == null ? __systemCmdDelay : performer._cmdDelay;
                 setTimeout(resolve, cmdDelay);

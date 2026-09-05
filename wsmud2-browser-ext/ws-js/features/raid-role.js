@@ -8,11 +8,11 @@
 
     // WG/messageAppend/messageClear/TaskHelper/LayerHelper 已在其它模块中声明, 此处不重复声明
 
-    Message.append = function (msg,area) {
+    WMsg.append = function (msg,area) {
         // 【2026-08-11 修复】同步插入：弹窗内容 append 后立即绑定事件（.on('click')），异步批量会错过绑定 → 弹窗按钮失效
         messageAppend(msg,area,null,true);
     };
-    Message.clean = function () {
+    WMsg.clean = function () {
         messageClear();
     };
 

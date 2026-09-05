@@ -215,6 +215,95 @@
     let selectedTheme = "master";  // 界面主题：master 或 fork
     const scriptLoadErrors = [];  // 【2026-08-14】记录加载失败的脚本，全部加载完后在游戏日志区提示
 
+    // ============================================================
+    // 【2026-09-05 新版客户端适配】双模式
+    // ------------------------------------------------------------
+    // 旧模式（默认）：wsmud2.com / wsmud2.cn 首页 —— 扩展"替换客户端"，
+    //   屏蔽游戏自带 dist/ws.js，注入扩展自己的整套客户端（含 ws.js / dialog / login 等）。
+    // 新模式（newClientMode）：wsmud2.cn/new.html 这类加载 dist_new 客户端的新版页面 ——
+    //   新客户端（ES Module 重写版）自己跑：渲染 UI、连接 WebSocket、维护 GameState。
+    //   扩展只注入"增强模块"（自动战斗/Raid/触发器/funny2 等），并跳过扩展的
+    //   "客户端核心"文件（ws-utils/ws-client/ws-map/ws-combat/ws-process/ws/
+    //   login-core/login-methods/wslogin/dialog 面板/state/wg-setting/wg-confirm/
+    //   extension-manager/raid-role），避免覆盖新客户端同名的全局。
+    //   页面脚本用 window.__extNewClientMode 判断是否新模式（模块据此调整行为）。
+    //   注意：newClientMode 必须在 DOMContentLoaded 之后判断 —— document_start 时
+    //   <head> 还没解析，querySelector 找不到 dist_new 的 <script> 标签。
+    // ============================================================
+    function detectNewClientMode() {
+        return !!document.querySelector('script[src*="dist_new"]');
+    }
+
+    // 新模式要跳过的"客户端核心"文件（保持注入顺序不变，仅做过滤）
+    const NEW_CLIENT_EXCLUDES = new Set([
+        // --- 扩展自己的整套客户端核心（新客户端已内置同款，再注入会冲突）---
+        "ws-js/core/ws-utils.js",
+        "ws-js/core/ws-client.js",
+        "ws-js/core/ws-map.js",
+        "ws-js/core/ws-combat.js",
+        "ws-js/core/ws-process.js",
+        "ws-js/core/ws.js",
+        "ws-js/core/login-core.js",
+        "ws-js/core/login-methods.js",
+        "ws-js/core/wslogin.js",
+        "ws-js/core/wslogin-crypto.js",
+        "ws-js/core/wslogin-ui.js",
+        "ws-js/core/wslogin-flow.js",
+        // --- 对话框面板（新客户端自带 Dialog）---
+        "ws-js/modules/dialog/dialog-base.js",
+        "ws-js/modules/dialog/dialog-base-utils.js",
+        "ws-js/modules/dialog/dialog-common.js",
+        "ws-js/modules/dialog/dialog-skills-1.js",
+        "ws-js/modules/dialog/dialog-skills-2.js",
+        "ws-js/modules/dialog/dialog-skills-3.js",
+        "ws-js/modules/dialog/dialog-master.js",
+        "ws-js/modules/dialog/dialog-pack-1.js",
+        "ws-js/modules/dialog/dialog-pack-2.js",
+        "ws-js/modules/dialog/dialog-pack-3.js",
+        "ws-js/modules/dialog/dialog-pack2.js",
+        "ws-js/modules/dialog/dialog-trade.js",
+        "ws-js/modules/dialog/dialog-list-1.js",
+        "ws-js/modules/dialog/dialog-list-2.js",
+        "ws-js/modules/dialog/dialog-channel.js",
+        "ws-js/modules/dialog/dialog-setting-1.js",
+        "ws-js/modules/dialog/dialog-setting-2.js",
+        "ws-js/modules/dialog/dialog-tasks.js",
+        "ws-js/modules/dialog/dialog-stats-1.js",
+        "ws-js/modules/dialog/dialog-stats-2.js",
+        "ws-js/modules/dialog/dialog-jh-fam.js",
+        "ws-js/modules/dialog/dialog-jh-fb.js",
+        "ws-js/modules/dialog/dialog-jh-ar.js",
+        "ws-js/modules/dialog/dialog-jh.js",
+        "ws-js/modules/dialog/dialog-shop.js",
+        "ws-js/modules/dialog/dialog-message-1.js",
+        "ws-js/modules/dialog/dialog-message-2.js",
+        "ws-js/modules/dialog/dialog-relation.js",
+        "ws-js/modules/dialog/dialog-party.js",
+        "ws-js/modules/dialog/dialog-team.js",
+        "ws-js/modules/dialog/dialog-events.js",
+        "ws-js/modules/dialog/dialog-pm.js",
+        "ws-js/modules/dialog/dialog-keys-1.js",
+        "ws-js/modules/dialog/dialog-keys-2.js",
+        "ws-js/modules/dialog/dialog-extend-1.js",
+        "ws-js/modules/dialog/dialog-extend-2.js",
+        "ws-js/modules/dialog/dialog-extend-3.js",
+        "ws-js/modules/dialog/dialog-extend-4.js",
+        // --- 新客户端已内置同款全局的对象 ---
+        // 注意：state.js / raid-role.js 必须保留 —— 扩展大量模块在加载时就引用
+        // 全局 GameState / Role / Room（新客户端是登录后才暴露这些全局，加载时还没有），
+        // 跳过了会直接 ReferenceError 崩溃（甚至导致登录握手失败）。
+        "ws-js/modules/wg-core/wg-setting.js",       // Setting（新客户端自带）
+        "ws-js/modules/wg-core/wg-confirm.js",       // Confirm（新客户端自带）
+        "ws-js/modules/extension-manager.js"         // SCRIPT（新客户端自带）
+    ]);
+
+    // 新模式：给页面脚本打标记（在扩展脚本加载前设置）。
+    // 【2026-09-05 修复】直接写 window 属性（content script 与页面脚本共享 window 对象），
+    // 不再用注入 <script> 的方式 —— 注入脚本可能因解析时序不执行，导致模块误走旧模式分支。
+    function markNewClientMode() {
+        try { window.__extNewClientMode = true; } catch (e) { }
+    }
+
     // 按顺序加载自定义脚本（并行抓取 + 按插入顺序执行）
     function loadScriptsInOrder() {
         if (!extensionEnabled) {
@@ -222,8 +311,16 @@
             return Promise.resolve();
         }
 
+        // DOMContentLoaded 之后判定新模式（此时 <head> 已解析，能查到 dist_new 的 script 标签）
+        const newClientMode = detectNewClientMode();
+        if (newClientMode) {
+            markNewClientMode();
+        }
+
         // 复制一份列表，把 funny2 模块插进去（如果在列表里就加）
-        const scriptFiles = baseScriptFiles.slice();
+        const scriptFiles = (newClientMode
+            ? baseScriptFiles.filter((f) => !NEW_CLIENT_EXCLUDES.has(f))
+            : baseScriptFiles.slice());
         if (loadFunny2) {
             scriptFiles.splice(FUNNY2_INSERT_INDEX, 0,
                 "ws-js/features/funny2-utils.js",
@@ -234,6 +331,12 @@
                 "ws-js/features/funny2-layout.js",
                 "ws-js/features/funny2-auto.js"
             );
+        }
+        // 【2026-09-05 新版客户端适配】新模式在首位加载补丁脚本：
+        // 修补新客户端 Dialog 懒初始化缺陷（直接收到 dialog 数据且面板未打开时 onData 崩溃）。
+        // 放在 funny2 之后 splice，避免打乱 funny2 的固定插入位置。
+        if (newClientMode) {
+            scriptFiles.splice(0, 0, "ws-js/core/newclient-shim.js");
         }
         // 主题脚本：在 funny2 布局之后加载
         if (selectedTheme === "fork") {

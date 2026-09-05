@@ -23,7 +23,7 @@
 
     (function () {
         const executor = new AtCmdExecutor("wait", function (performer, param) {
-            if (performer.log()) Message.cmdLog(`等待 ${(param / 1000).toFixed(2)} 秒`);
+            if (performer.log()) WMsg.cmdLog(`等待 ${(param / 1000).toFixed(2)} 秒`);
             return new Promise(resolve => {
                 setTimeout(() => resolve(), param);
             });
@@ -57,7 +57,7 @@
                 text = JSON.stringify(eval(text.substring(1)));
             }
             var message = `&nbsp;&nbsp;[debug]: <hiz>${text}</hiz>`;
-            Message.append(message);
+            WMsg.append(message);
             // console.log(message);
         });
         CmdExecuteCenter.addExecutor(executor);
@@ -65,13 +65,13 @@
 
     (function () {
         const executor = new AtCmdExecutor("print", function (performer, param) {
-            Message.append(param,0);
+            WMsg.append(param,0);
         });
         CmdExecuteCenter.addExecutor(executor);
     })();
     (function () {
         const executor = new AtCmdExecutor("show", function (performer, param) {
-            Message.append(param,1);
+            WMsg.append(param,1);
         });
         CmdExecuteCenter.addExecutor(executor);
     })();
@@ -143,10 +143,10 @@
                 const list = GM_getValue(roleid + "_zml", zml);
                 const item = (Array.isArray(list) ? list : []).find(function (z) { return z && z.name == name; });
                 if (!item) {
-                    if (performer.log()) Message.append(`<hir>自命令「${name}」不存在，@zmlwait 已跳过</hir>`, 0);
+                    if (performer.log()) WMsg.append(`<hir>自命令「${name}」不存在，@zmlwait 已跳过</hir>`, 0);
                     return Promise.resolve();
                 }
-                if (performer.log()) Message.cmdLog(`执行自命令「${name}」（阻塞等待完成）`);
+                if (performer.log()) WMsg.cmdLog(`执行自命令「${name}」（阻塞等待完成）`);
                 return _runZmlBlocking(item, name);
             } catch (e) {
                 console.error('[Raid] @zmlwait 执行失败:', e);
@@ -177,7 +177,7 @@
                         setTimeout(_ => { tryExecute(callback); }, tryAgain != null ? tryAgain : 500);
                     }
                 };
-                if (performer.log()) Message.cmdLog("等待，直至符合条件", cmd);
+                if (performer.log()) WMsg.cmdLog("等待，直至符合条件", cmd);
                 return new Promise(resolve => {
                     tryExecute(resolve);
                 });
@@ -204,7 +204,7 @@
             const validCmd = CmdPrehandleCenter.shared().handle(performer, cmd);
             let exp = validCmd.substring(4);
             console.log(performer);
-            if (performer.log()) Message.cmdLog("调用 js", exp);
+            if (performer.log()) WMsg.cmdLog("调用 js", exp);
             const result = /^\(\$([A-Za-z_][a-zA-Z0-9_]*?)\)\s*=\s*/.exec(exp);
             if (result == null) {
                 eval(exp);
@@ -225,7 +225,7 @@
         const execute = function (performer, cmd) {
             const validCmd = CmdPrehandleCenter.shared().handle(performer, cmd);
             let exp = validCmd.substring(6);
-            if (performer.log()) Message.cmdLog("停止流程", exp);
+            if (performer.log()) WMsg.cmdLog("停止流程", exp);
             const result = /^\(\$([A-Za-z_][a-zA-Z0-9_]*?)\)\s*=\s*/.exec(exp);
             if (result == null) {
                 ManagedPerformerCenter.getAll().filter(x => x.name() == exp).forEach(x => x.stop())
@@ -247,17 +247,17 @@
         const execute = function (performer, cmd) {
             const validCmd = CmdPrehandleCenter.shared().handle(performer, cmd);
             let exp = validCmd.substring(10).trim();
-            if (performer.log()) Message.cmdLog("发呆检测", exp);
+            if (performer.log()) WMsg.cmdLog("发呆检测", exp);
             if (exp == "开" || exp == "关") {
                 _idleCmdSwitch = exp;
                 GM_setValue("_idleCmdSwitch", _idleCmdSwitch);
                 idleCmdStart();
-                Message.append("<hio>发呆检测已" + (exp == "开" ? "开启" : "关闭") + "</hio>");
+                WMsg.append("<hio>发呆检测已" + (exp == "开" ? "开启" : "关闭") + "</hio>");
             } else if (exp == "状态") {
                 var status = _idleCmdSwitch == "开" ? "开启" : "关闭";
                 var isIdle = (typeof Role !== 'undefined' && Role.isIdle) ? Role.isIdle() : false;
                 var idleSec = isIdle ? Role.getIdleTime() : 0;
-                Message.append("<hio>发呆检测：" + status + "，阈值：" + _idleCmdSeconds + "秒" + (isIdle ? "，当前已发呆：" + idleSec + "秒" : "") + "，命令：" + (_idleCmdContent || "无") + "</hio>");
+                WMsg.append("<hio>发呆检测：" + status + "，阈值：" + _idleCmdSeconds + "秒" + (isIdle ? "，当前已发呆：" + idleSec + "秒" : "") + "，命令：" + (_idleCmdContent || "无") + "</hio>");
             } else {
                 var parts = exp.split(/\s+/);
                 if (parts.length >= 1 && !isNaN(parseInt(parts[0]))) {
@@ -265,7 +265,7 @@
                     _idleCmdContent = parts.slice(1).join(" ") || _idleCmdContent;
                     GM_setValue("_idleCmdSeconds", _idleCmdSeconds);
                     GM_setValue("_idleCmdContent", _idleCmdContent);
-                    Message.append("<hio>发呆检测已设置：阈值 " + _idleCmdSeconds + "秒，命令：" + (_idleCmdContent || "无") + "</hio>");
+                    WMsg.append("<hio>发呆检测已设置：阈值 " + _idleCmdSeconds + "秒，命令：" + (_idleCmdContent || "无") + "</hio>");
                 }
             }
         };

@@ -1027,8 +1027,8 @@ const RaidUI = {
         }
         var itemlogStyle = document.getElementById('raid-itemlog-style');
         if (itemlogStyle) itemlogStyle.remove();
-        Message.clean();
-        Message.append(html, 2);
+        WMsg.clean();
+        WMsg.append(html, 2);
         $("#wsmud_raid_left").on('click', function () {
             if (leftAction) leftAction();
         });
