@@ -154,7 +154,7 @@ function dateFormat(fmt, date) {
 }
 
 // 使用事件委托处理 cmd 属性（如 cmd='look3 <uid>'）
-$(document).on('click', '.container [cmd], .WG_log_log [cmd], .WG_log [cmd], .channel [cmd]', function (e) {
+$(document).on('click', '.container [cmd], .WG_right_log [cmd], .WG_left_log [cmd], .channel [cmd]', function (e) {
     const cmd = $(this).attr('cmd');
     if (cmd && cmd.indexOf('look3') === 0) {
         if (typeof SendCommand === 'function') {

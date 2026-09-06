@@ -6,7 +6,7 @@
 //  Message Output
 //---------------------------------------------------------------------------
 
-var Message = {
+var WMsg = {
     append: function (msg) {
         console.log(msg);
     },
@@ -19,6 +19,19 @@ var Message = {
         this.append(msg);
     }
 };
+
+// 【2026-09-05 新版客户端适配】新模式跳过 raid-role.js（新客户端自带 Role），
+// 由这里把 Raid/Trigger 的日志输出接到插件日志区（原在 raid-role.js 里做）。
+// 新模式判定：优先用 content.js 打的标记，兜底自查 DOM。
+var _extNewClientMode = window.__extNewClientMode || !!document.querySelector('script[src*="dist_new"]');
+if (_extNewClientMode) {
+    WMsg.append = function (msg, area) {
+        try { messageAppend(msg, area, null, true); } catch (e) { console.log(msg); }
+    };
+    WMsg.clean = function () {
+        try { messageClear(); } catch (e) { }
+    };
+}
 
 function CopyObject(obj) {
     return JSON.parse(JSON.stringify(obj));

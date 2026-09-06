@@ -393,11 +393,11 @@
                 console.log(`编译总耗时: ${end - start} 毫秒`);
             } catch (err) {
                 // 【2026-08-11】错误信息带流程名，方便排障定位
-                Message.append(`<ord>流程「${this._name}」编译错误</ord>: ${err}`);
+                WMsg.append(`<ord>流程「${this._name}」编译错误</ord>: ${err}`);
                 return;
             }
 
-            if (this._log) Message.append(`<hiy>开始执行，流程: ${this._name}...</hiy>`);
+            if (this._log) WMsg.append(`<hiy>开始执行，流程: ${this._name}...</hiy>`);
             this._running = true;
             this._pausing = false;
 
@@ -417,12 +417,12 @@
             for (const subflow of this._subflows) {
                 subflow.stop();
             }
-            if (this._log) Message.append(`<hiy>执行完毕，流程: ${this._name}。</hiy>`);
+            if (this._log) WMsg.append(`<hiy>执行完毕，流程: ${this._name}。</hiy>`);
             if (this._callback) this._callback();
         }
         pause() {
             if (!this._running) return;
-            if (this._log) Message.append(`<hiy>暂停执行，流程: ${this._name}...</hiy>`);
+            if (this._log) WMsg.append(`<hiy>暂停执行，流程: ${this._name}...</hiy>`);
             this._pausing = true;
             for (const subflow of this._subflows) {
                 subflow.pause();
@@ -430,7 +430,7 @@
         }
         resume() {
             if (!this._running || !this._pausing) return;
-            if (this._log) Message.append(`<hiy>恢复执行，流程: ${this._name}。</hiy>`);
+            if (this._log) WMsg.append(`<hiy>恢复执行，流程: ${this._name}。</hiy>`);
             this._pausing = false;
             for (const subflow of this._subflows) {
                 subflow.resume();
@@ -463,7 +463,7 @@
             } catch (err) {
                 // 【2026-08-11】错误信息带流程名（+出错命令片段，便于定位哪条命令）
                 var _errCmd = (cmd && typeof cmd === 'string' && cmd.length > 60) ? cmd.substring(0, 60).replace(/[\r\n]/g, ' ') + '…' : (cmd || '');
-                Message.append(`<ord>流程「${this._name}」执行错误</ord>: ${err}${_errCmd ? '（命令：' + _errCmd + '）' : ''}`);
+                WMsg.append(`<ord>流程「${this._name}」执行错误</ord>: ${err}${_errCmd ? '（命令：' + _errCmd + '）' : ''}`);
                 this.stop();
                 return;
             } finally {

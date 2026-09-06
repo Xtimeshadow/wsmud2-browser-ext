@@ -15,15 +15,22 @@
 // 避免连续开关弹窗累积 Vue 实例（内存泄漏 + 状态残留）
 let _triggerVue = null;
 
-var Message = {
-    append: function (msg, area) {
+// 【2026-09-05 修复】WMsg 用"扩展已有对象"而非重新 var 定义：
+// raid-tools.js 先定义了带 cmdLog 的 WMsg（Raid 流程日志用），这里若再用
+// var WMsg = {append, clean} 会覆盖掉 cmdLog，导致不带 //~silent 的流程
+// 调用 WMsg.cmdLog() 时报 "cmdLog is not a function" 而停止。
+var WMsg = window.WMsg || {};
+if (typeof WMsg.append !== 'function') {
+    WMsg.append = function (msg, area) {
         // 【2026-08-11 修复】同步插入：弹窗 HTML append 后立即 new Vue({el:'#app'})，异步批量会让 Vue 挂载失败 → 弹窗空白
         messageAppend(msg, area, null, true);
-    },
-    clean: function () {
+    };
+}
+if (typeof WMsg.clean !== 'function') {
+    WMsg.clean = function () {
         messageClear();
-    },
-};
+    };
+}
 
 const TriggerUI = {
     triggerHome: function () {

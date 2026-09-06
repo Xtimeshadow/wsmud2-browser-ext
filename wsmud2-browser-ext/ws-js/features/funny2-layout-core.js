@@ -21,6 +21,31 @@ window.__funny2_layout = window.__funny2_layout || {};
             $('<div class="right"></div>')
         );
 
+        // 同步游戏主界面(.container)的字体设置到左右侧栏
+        (function syncContainerFont() {
+            function applyFont() {
+                var container = document.querySelector('.container');
+                if (!container) return;
+                var style = getComputedStyle(container);
+                // 左右栏及两侧日志统一继承游戏主界面字体（不受第三方脚本/fork主题的字号干扰）
+                $('.left, .right, .WG_left_log, .WG_right_log').css({
+                    'font-family': style.fontFamily,
+                    'font-size': style.fontSize
+                });
+            }
+            var timer = setInterval(function () {
+                if (!document.querySelector('.container')) return;
+                clearInterval(timer);
+                applyFont();
+                // 游戏内修改字体(font/fontsize)时同步生效
+                var observer = new MutationObserver(function () { applyFont(); });
+                observer.observe(document.querySelector('.container'), {
+                    attributes: true,
+                    attributeFilter: ['style']
+                });
+            }, 300);
+        })();
+
         function confirmWight() {
             var d = document.querySelector('.dialog-confirm');
             var l = document.querySelector('.left') || { offsetWidth: 0 };
@@ -44,8 +69,8 @@ window.__funny2_layout = window.__funny2_layout || {};
             function attemptMove() {
                 var moveTasks = [
                     { source: '#raidToolbar', target: 'body > div.left > div.left-hotkeys' },
-                    { source: '.WG_log', target: 'body > div.left > div.left-hotkeys' },
-                    { source: '.WG_log_log', target: 'body > div.right > div.left-console' },
+                    { source: '.WG_left_log', target: 'body > div.left > div.left-hotkeys' },
+                    { source: '.WG_right_log', target: 'body > div.right' },
                     { source: '.channel', target: 'body > div.right > div.right-channel' }
                 ];
                 moveTasks.forEach(function (task) {
@@ -67,24 +92,23 @@ window.__funny2_layout = window.__funny2_layout || {};
         /********************RIGHT********************/
         GM_addStyle([
             '.right{ order: 1; display: flex; flex-direction: column; flex-wrap: nowrap; }',
-            '.right-channel { width: 100%; flex: 0 0 50%; overflow: auto; margin-top: 10px; display: flex; flex-direction: column; position: relative; min-height: 0; }',
+            '.right-channel { width: 100%; flex: 0 0 50%; margin: 8px; overflow: auto; display: flex; flex-direction: column; position: relative; min-height: 0; }',
             '.channel { max-height: 90% !important; flex: 1; overflow: auto;}',
+            '.right .channel > pre { font-family: inherit !important; font-size: inherit !important; }',
             '.right-channel-tabs { flex-shrink: 0; display: flex; gap: 2px; padding: 4px 6px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.15); }',
-            '.right-channel-tabs > span { cursor: pointer; padding: 2px 8px; border-radius: 3px; font-size: 12px; color: #aaa; }',
+            '.right-channel-tabs > span { cursor: pointer; padding: 2px 8px; border-radius: 3px; color: #aaa; }',
             '.right-channel-tabs > span:hover { background: rgba(255,255,255,0.1); color: #fff; }',
             '.right-channel-tabs > span.selected { background: rgba(190,190,190,0.3); color: #fff; }',
-            '.left-console { width: 100%; flex: 1; overflow: auto; margin: 8px; display: flex; flex-direction: column; min-height: 0; }',
-            '.WG_log_log { width: 100%;height: 100%; flex: 1; overflow: hidden; max-height: none !important; display: flex; flex-direction: column; }',
-            '.WG_log_log_title { color: #ffffff; font-size: 14px; font-weight: bold; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }',
-            '.WG_log_log > pre { flex: 1; overflow-y: auto; font-family: \'JetBrains Mono\', monospace; font-size: 12px; }',
+            '.WG_right_log { width: 100%; flex: 1; margin: 8px; overflow: auto; min-height: 0; max-height: none !important; display: flex; flex-direction: column; }',
+            '.WG_right_log_title { color: #ffffff; font-weight: bold; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }',
+            '.WG_right_log > pre { flex: 1; overflow-y: auto; }',
             '.right-divider { height: 5px; cursor: row-resize; background: rgba(128,128,128,0.3); flex-shrink: 0; position: relative; z-index: 1; display: none; }',
             '.right-divider:hover, .right-divider.active { background: rgba(128,128,128,0.6); }',
         ].join('\n'));
 
         $(".right").append(
             $('<div class="right-channel"></div>'),
-            $('<div class="right-divider"></div>'),
-            $('<div class="left-console"></div>')
+            $('<div class="right-divider"></div>')
         );
 
         // 可拖拽分割线
@@ -160,7 +184,7 @@ window.__funny2_layout = window.__funny2_layout || {};
             '.left { height: calc(100vh - 20px); order: -1; display: flex; flex-direction: column; flex-wrap: nowrap; }',
             '.left-content { width: 100%; height: auto; flex: 0 0 auto;}',
             '.left-hotkeys { width: 100%; flex: 1; padding-left: 5px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }',
-            '.WG_log { width: 100%; flex: 1; overflow-y: auto; max-height: none !important; min-height: 0; }',
+            '.WG_left_log { width: 100%; flex: 1; overflow-y: auto; max-height: none !important; min-height: 0; }',
             '.map-panel { display: flex; justify-content: center; overflow-x: auto; }',
             '.map-panel svg.map { flex-shrink: 0; }',
         ].join('\n'));
@@ -175,7 +199,7 @@ window.__funny2_layout = window.__funny2_layout || {};
     layout.initLeftContent = function () {
         /********************LEFT-CONTENT********************/
         GM_addStyle([
-            '.left-content { margin: 10px 0; font-size: 16px; overflow: auto; }',
+            '.left-content { margin: 10px 0; overflow: auto; }',
             '.left-content { display: flex; flex-direction: column; flex-wrap: nowrap; }',
             '.content-title { flex: 0 0 auto; border: gray solid 1px; border-radius: 3px; display: flex; }',
             '.content-info { flex: 0 1 auto; border: gray solid 1px; border-radius: 3px; margin-top: 5px; overflow: auto; }',

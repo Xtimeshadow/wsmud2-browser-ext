@@ -62,7 +62,7 @@ function _getZdyItemCSS() {
         padding-left: 0.4em;
         padding-right: 0.4em;
     }
-    .WG_log{
+    .WG_left_log{
         flex: 1;
         overflow-y: auto;
         border: 1px solid #404040;
@@ -70,38 +70,33 @@ function _getZdyItemCSS() {
         width: calc(100% - 10px);
         border-radius: 0.5em;
     }
-    .WG_log > pre {
+    .WG_left_log > pre {
         margin: 0px;
         white-space: pre-line;
     }
-    .WG_log_log {
+    .WG_right_log {
         flex: 1;
         overflow-y: auto;
-        border: 1px solid #303030;
         max-height: 25em;
         width: calc(100% - 10px);
-        border-radius: 0.5em;
         margin-top: 4px;
         background-color: rgba(0, 0, 0, 0.3);
         display: flex;
         flex-direction: column;
     }
-    .WG_log_log_title {
+    .WG_right_log_title {
         color: #ffffff;
-        font-size: 14px;
         font-weight: bold;
         padding: 4px 10px;
         border-bottom: 1px solid rgba(255,255,255,0.25);
         flex-shrink: 0;
     }
-    .WG_log_log > pre {
+    .WG_right_log > pre {
         margin: 0px;
         white-space: pre-line;
         flex: 1;
         overflow-y: auto;
         padding: 4px 10px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 12px;
     }
     .WG_button {
         width: calc(100% - 40px); 
@@ -176,7 +171,7 @@ function _getZdyItemCSS() {
         font-weight: bold;
     }
     #raidToolbar, #raidToolbar * { box-sizing: content-box; }
-    .WG_log, .WG_log * { box-sizing: content-box; }
+    .WG_left_log, .WG_left_log * { box-sizing: content-box; }
     .supernova-text {
         position: relative !important;
         font-weight: bold;

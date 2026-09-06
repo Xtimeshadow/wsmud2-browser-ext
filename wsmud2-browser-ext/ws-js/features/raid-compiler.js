@@ -420,7 +420,7 @@ var FlowStore = null; // PersistentCache
             const flowName = r[2];
             let source = FlowStore.get(flowName);
             if (source == null) {
-                Message.append(`<ord>未找到调用的流程 ${flowName}</ord>`);
+                WMsg.append(`<ord>未找到调用的流程 ${flowName}</ord>`);
                 //throw `未找到调用的流程 ${flowName}`;
             }
             let callSource = `[if] true\n` + SourceCodeHelper.appendHeader("    ", `${args}\n${source}`);

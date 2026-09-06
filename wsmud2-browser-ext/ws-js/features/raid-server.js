@@ -19,8 +19,8 @@ const Server = {
         Server._sync("uploadFlows", { id: Role.id, value: value }, pass => {
             GM_setClipboard(pass);
             alert(`角色流程上传成功，该角色流程会在服务器保存 24 小时。\n角色流程获取码：${pass}，已复制到系统剪切板。`);
-            Message.append(`<hiy>角色流程获取码：${pass}</hiy>`);
-            Message.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${pass}');" >
+            WMsg.append(`<hiy>角色流程获取码：${pass}</hiy>`);
+            WMsg.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${pass}');" >
                              我无法复制 </span></div>`, 2);
         }, _ => {
             alert("角色流程上传失败！");
@@ -55,8 +55,8 @@ const Server = {
         Server._sync("uploadTriggers", { id: Role.id, value: value }, pass => {
             GM_setClipboard(pass);
             alert(`角色触发器上传成功，该角色触发会在服务器保存 24 小时。\n角色触发器获取码：${pass}，已复制到系统剪切板。`);
-            Message.append(`<hiy>角色触发获取码：${pass}</hiy>`);
-            Message.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${pass}');" >
+            WMsg.append(`<hiy>角色触发获取码：${pass}</hiy>`);
+            WMsg.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${pass}');" >
                                 我无法复制 </span></div>`, 2);
         }, _ => {
             alert("角色触发器上传失败！");
@@ -132,8 +132,8 @@ const Server = {
         Server._sync("uploadSingle", params, token => {
             GM_setClipboard(token);
             alert(`${type}分享成功，该${type}会在服务器保存 30 天\n每次下载会延长保存 始于下载时刻的 30 天\n分享码：${token}\n已复制到系统剪切板。`);
-            Message.append(`<hiy>${type}分享码：${token}</hiy>`);
-            Message.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${token}');" >
+            WMsg.append(`<hiy>${type}分享码：${token}</hiy>`);
+            WMsg.append(`<div class="item-commands"><span cmd = "@js prompt('请手动复制下面的数据','${token}');" >
                                      我无法复制 </span></div>`, 2);
         }, error => {
             alert(error);
@@ -157,7 +157,7 @@ const Server = {
             const result = WorkflowConfig.createWorkflow(flow.name, flow.source, target);
             if (result == true) {
                 //alert(`导入流程 ${flow.name} 成功！`);
-                Message.append(`<hiy>导入流程 ${flow.name} 成功！</hiy>`);
+                WMsg.append(`<hiy>导入流程 ${flow.name} 成功！</hiy>`);
             } else {
                 alert(result);
             }
@@ -182,7 +182,7 @@ const Server = {
             const result = unsafeWindow.TriggerCenter.create(trigger.name, trigger.event, trigger.conditions, trigger.source, trigger.active);
             if (result == true) {
                 //alert(`导入触发器 ${trigger.name} 成功！`);
-                Message.append(`<hiy>导入触发器 ${trigger.name} 成功！</hiy>`);
+                WMsg.append(`<hiy>导入触发器 ${trigger.name} 成功！</hiy>`);
             } else {
                 alert(result);
             }

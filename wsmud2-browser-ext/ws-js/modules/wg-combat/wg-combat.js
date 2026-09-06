@@ -167,8 +167,8 @@ Object.assign(WG, {
         if (t == false) { WG.timer_close(); WG.zdwk(); } else { messageAppend("自动打坐学技能"); }
     },
     showhideborad: function () {
-        if ($('.WG_log').css('display') == 'none') { window.localStorage.setItem("closeBorad", "false"); $('.WG_log').show(); }
-        else { window.localStorage.setItem("closeBorad", "true"); $('.WG_log').hide(); }
+        if ($('.WG_left_log').css('display') == 'none') { window.localStorage.setItem("closeBorad", "false"); $('.WG_left_log').show(); }
+        else { window.localStorage.setItem("closeBorad", "true"); $('.WG_left_log').hide(); }
     },
     showhidebtn: function () {
         if ($('.WG_button').css('display') == 'none') { window.localStorage.setItem("closeBtn", "false"); $('.WG_button').show(); }
