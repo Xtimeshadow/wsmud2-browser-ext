@@ -312,53 +312,65 @@ Object.assign(WG, {
                           }
                       }
 
-                      clearTimeout(window._obtainedTimer);
-                      window._obtainedTimer = setTimeout(function () {
-                          const parts = [];
+                      // 【2026-08-28 修复】只设一次定时器，不重置，避免持续涌入时永远不触发
+                      if (!window._obtainedTimer) {
+                          window._obtainedTimer = setTimeout(function () {
+                              try {
+                                  const parts = [];
 
-                          // 👉遍历计数对象，拼接 带数量的物品文本
-                          for(const name in window._obtainedItems){
-                              const count = window._obtainedItems[name];
-                              if(count <= 1){
-                                  parts.push(name);
-                              }else{
-                                  // count>1，把物品前缀的“一”替换成对应中文数字
-                                  // name示例："一本基本暗器秘籍" → "二本基本暗器秘籍"
-                                  const displayName = name.replace(/^一/, intToChineseNum(count));
-                                  parts.push(displayName);
+                                  // 👉遍历计数对象，拼接 带数量的物品文本
+                                  for(const name in window._obtainedItems){
+                                      const count = window._obtainedItems[name];
+                                      if(count <= 1){
+                                          parts.push(name);
+                                      }else{
+                                          // count>1，把物品前缀的"一"替换成对应中文数字
+                                          // name示例："一本基本暗器秘籍" → "二本基本暗器秘籍"
+                                          const displayName = name.replace(/^一/, intToChineseNum(count));
+                                          parts.push(displayName);
+                                      }
+                                  }
+
+                                  // 货币使用副本换算
+                                  const money = {...window._obtainedMoney};
+                                  if (money.copper >= 100) {
+                                      money.silver += Math.floor(money.copper / 100);
+                                      money.copper = money.copper % 100;
+                                  }
+                                  if (money.silver >= 100) {
+                                      money.gold += Math.floor(money.silver / 100);
+                                      money.silver = money.silver % 100;
+                                  }
+
+                                  if (money.gold > 0) parts.push(intToChineseNum(money.gold) + '两黄金');
+                                  if (money.silver > 0) parts.push(intToChineseNum(money.silver) + '两银子');
+                                  if (money.copper > 0) parts.push(intToChineseNum(money.copper) + '个铜板');
+
+                                  if (parts.length > 0) {
+                                      const merged = '你获得了' + parts.join('、') + '。';
+                                      console.log('[集中显示调试] 准备显示', merged, 'parts:', parts, 'items:', JSON.parse(JSON.stringify(window._obtainedItems)), 'money:', JSON.parse(JSON.stringify(window._obtainedMoney)));
+                                      messageAppend('<hiw>' + merged + '</hiw>', 1);
+                                  } else {
+                                      console.log('[集中显示调试] parts为空，items:', JSON.parse(JSON.stringify(window._obtainedItems)), 'money:', JSON.parse(JSON.stringify(window._obtainedMoney)));
+                                  }
+                              } catch (e) {
+                                  try { ExtLog.warn('[集中显示] 显示异常:', e && e.message); } catch (e2) {}
                               }
-                          }
 
-                          // 货币使用副本换算
-                          const money = {...window._obtainedMoney};
-                          if (money.copper >= 100) {
-                              money.silver += Math.floor(money.copper / 100);
-                              money.copper = money.copper % 100;
-                          }
-                          if (money.silver >= 100) {
-                              money.gold += Math.floor(money.silver / 100);
-                              money.silver = money.silver % 100;
-                          }
-
-                          if (money.gold > 0) parts.push(intToChineseNum(money.gold) + '两黄金');
-                          if (money.silver > 0) parts.push(intToChineseNum(money.silver) + '两银子');
-                          if (money.copper > 0) parts.push(intToChineseNum(money.copper) + '个铜板');
-
-                          if (parts.length > 0) {
-                              const merged = '你获得了' + parts.join('、') + '。';
-                              messageAppend('<hiw>' + merged + '</hiw>', 1);
-                          }
-
-                          // 清空缓存
-                          window._obtainedItems = {};
-                          window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
-                      }, 100);
+                              // 清空缓存（无论是否异常都清理，防止状态污染）
+                              window._obtainedTimer = null;
+                              window._obtainedItems = {};
+                              window._obtainedMoney = { gold: 0, silver: 0, copper: 0 };
+                          }, 100);
+                      }
+                      // 定时器已存在时，新物品直接累加进当前批次，定时器保持原样
+                      // 跳过原始消息显示，但保留 funny API
+                      if (unsafeWindow.funny && unsafeWindow.funny.API) {
+                          unsafeWindow.funny.API.onmessage(msg);
+                      }
+                      return;
                   }
-                  // 跳过原始消息显示，但保留 funny API
-                  if (unsafeWindow.funny && unsafeWindow.funny.API) {
-                      unsafeWindow.funny.API.onmessage(msg);
-                  }
-                  return;
+                  // itemName 为空时，不吞消息，走到 ws_on_message 正常显示
               }
               // 不集中显示时，让原始消息正常显示（走到 ws_on_message）
           }
