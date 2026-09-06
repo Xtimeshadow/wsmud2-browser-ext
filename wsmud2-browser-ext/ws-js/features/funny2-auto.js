@@ -49,7 +49,7 @@ window.__funny2_auto = {
                 return item.name.indexOf(name) !== -1 || name.indexOf(item.name) !== -1;
             });
             if (match && item.count > 0) {
-                SendCommand(cmd + ' ' + item.id);
+                f2SendCommand(cmd + ' ' + item.id);
                 count++;
             }
         });

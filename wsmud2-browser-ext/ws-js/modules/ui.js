@@ -46,11 +46,11 @@ var UI = {
             p = UI.btnui();
         }
         return `
-            <div class='WG_log'>
+            <div class='WG_left_log'>
                 <pre></pre>
             </div>
-            <div class='WG_log_log'>
-                <div class="WG_log_log_title">日志</div>
+            <div class='WG_right_log'>
+                <div class="WG_right_log_title">日志</div>
                 <pre></pre>
             </div>` + p;
     },

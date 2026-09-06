@@ -27,8 +27,8 @@ Object.assign(WG, {
           zdy_btnlist = GM_getValue(roleid + "_zdy_btnlist", zdy_btnlist);
           messageClear();
           let html = UI.zdyBtnsetui();
-          // 【2026-08-15 修改】自定义按钮面板属于快捷面板一类，与定时任务/自命令一致渲染到左侧 .WG_log
-          // （原 area=0 渲染到右侧 .WG_log_log）
+          // 【2026-08-15 修改】自定义按钮面板属于快捷面板一类，与定时任务/自命令一致渲染到左侧 .WG_left_log
+          // （原 area=0 渲染到右侧 .WG_right_log）
           messageAppend(html, 2, null, true);
           var keyitem = ["Q", "W", "E", "R", "T", "Y"];
           let i = 0;
@@ -85,7 +85,7 @@ Object.assign(WG, {
               inzdy_btn = true;
               var html = UI.zdybtnui();
               $('.WG_button').remove();
-              $(".content-message").after(html);   // 【2026-08-09 修复】锚点改 .content-message：.WG_log 已被 funny2 搬到左侧，用它做锚点会导致保存后按钮栏位置漂移
+              $(".content-message").after(html);   // 【2026-08-09 修复】锚点改 .content-message：.WG_left_log 已被 funny2 搬到左侧，用它做锚点会导致保存后按钮栏位置漂移
               let keyitem = ["Q", "W", "E", "R", "T", "Y"];
 
               for (let i = 0; i < keyitem.length; i++) {
@@ -111,7 +111,7 @@ Object.assign(WG, {
 
               var html = UI.btnui();
               $('.WG_button').remove();
-              $(".content-message").after(html);   // 【2026-08-09 修复】锚点改 .content-message：.WG_log 已被 funny2 搬到左侧，用它做锚点会导致保存后按钮栏位置漂移
+              $(".content-message").after(html);   // 【2026-08-09 修复】锚点改 .content-message：.WG_left_log 已被 funny2 搬到左侧，用它做锚点会导致保存后按钮栏位置漂移
 
               $(".go_wumiao").on("click", WG.go_wumiao);
               $(".go_home").on("click", WG.go_home);
