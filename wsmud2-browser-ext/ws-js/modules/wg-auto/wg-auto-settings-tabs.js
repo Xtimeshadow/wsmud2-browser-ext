@@ -13,7 +13,6 @@ Object.assign(WG, {
         $("#family").off('change');
         $('#autorelogin').off('click')
         $('#autorecover').off('click')
-        $('#merge_item_display').off('click')
         $('#dpssakada').off('click')
         $('.clean_dps').off('click')
 
@@ -226,10 +225,6 @@ Object.assign(WG, {
         $('#getitemShow').click(function () {
             getitemShow = WG.switchReversal($(this));
             GM_setValue(roleid + "_getitemShow", getitemShow);
-        });
-        $('#merge_item_display').click(function () {
-            merge_item_display = WG.switchReversal($(this));
-            GM_setValue(roleid + "_merge_item_display", merge_item_display);
         });
         $('#unauto_pfm').change(function () {
             unauto_pfm = $('#unauto_pfm').val();
@@ -502,7 +497,6 @@ Object.assign(WG, {
 
         $("#color_select").val(color_select);
         $('#getitemShow').val(getitemShow);
-        $('#merge_item_display').val(merge_item_display);
         $('#unauto_pfm').val(unauto_pfm);
         $('#auto_command').val(auto_command);
         $('#die_str').val(die_str);

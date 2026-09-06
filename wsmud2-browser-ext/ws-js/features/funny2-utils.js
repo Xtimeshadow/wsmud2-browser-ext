@@ -72,20 +72,31 @@ function DeepCopy(object) {
 }
 
 // 发送命令：支持字符串或数组（数组首项为数字时作为延迟毫秒）
-function SendCommand(command) {
+// 【2026-09-05 新版客户端适配】改名 f2SendCommand，不再覆盖全局 SendCommand：
+//  - 旧模式：仍挂到 window.SendCommand（保持原行为，拦截游戏/扩展的命令）
+//  - 新模式：新客户端自带 SendCommand（模块内部发送不走 window），扩展内部改用 f2SendCommand
+function f2SendCommand(command) {
     if (Array.isArray(command)) {
         if (command.length === 0) return;
         let cmd1 = command[0];
         let cmd2 = command.slice(1);
         if (typeof cmd1 === "number") {
-            setTimeout(() => SendCommand(cmd2), cmd1);
+            setTimeout(() => f2SendCommand(cmd2), cmd1);
         } else if (cmd1) {
-            SendCommand(cmd1);
-            SendCommand(cmd2);
+            f2SendCommand(cmd1);
+            f2SendCommand(cmd2);
         }
     } else if (typeof command === "string") {
         window.WG.SendCmd(command);
     }
+}
+// 【2026-09-05 新版客户端适配】新模式判定：优先用 content.js 打的标记，兜底自查 DOM
+// （防止标记脚本未执行时误走旧模式分支、覆盖新客户端的 SendCommand 导致登录异常）
+var _extNewClientMode = window.__extNewClientMode || !!document.querySelector('script[src*="dist_new"]');
+if (_extNewClientMode) {
+    window.f2SendCommand = f2SendCommand;   // 新模式：扩展内部专用（不碰 window.SendCommand）
+} else {
+    window.SendCommand = f2SendCommand;     // 旧模式：保持原覆盖行为
 }
 
 // 追加内容到主消息区并自动滚动

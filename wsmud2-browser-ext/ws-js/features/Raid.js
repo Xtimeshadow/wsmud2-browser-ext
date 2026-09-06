@@ -69,8 +69,12 @@
         // TaskHelper/LayerHelper 已全局声明, 无需重复赋值
 
         unsafeWindow.ToRaid = ToRaid;
-        unsafeWindow.Role = Role;
-
+        // 【2026-09-05 新版客户端适配】新模式不覆盖 window.Role（新客户端自带并维护 Role），
+        // 但扩展自己的 Role 状态机必须照常 init —— Role.init() 里注册了消息钩子
+        // （登录钩子会创建 Raid 工具栏 showToolbar 等），跳过会导致工具栏缺失、Role 不刷新。
+        if (!(window.__extNewClientMode || !!document.querySelector('script[src*="dist_new"]'))) {
+            unsafeWindow.Role = Role;
+        }
         Role.init();
         Room.init();
         SystemTips.init();

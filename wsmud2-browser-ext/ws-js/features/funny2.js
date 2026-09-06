@@ -148,7 +148,7 @@
                 if (item === 0) {
                 } else if (item.id && item.name && Object.entries(item).length === 2) {
                     if (!item.name.includes("尸体")) {
-                        SendCommand('get ' + item.id);
+                        f2SendCommand('get ' + item.id);
                     }
                 } else if (item.p !== 1) {
                     room.items.push(item);
@@ -286,7 +286,7 @@
                 for (var j = 0; j < xkx[i].length; j++) {
                     if (xkx[i][j] === x[1]) {
                         AddContent('<hig>检测到诗句<hiw>' + x[1] + '</hiw>，苏轻将帮你寻找石室。\n</hig>');
-                        SendCommand(["stopstate", "go enter", go[j], "lingwu bi"]);
+                        f2SendCommand(["stopstate", "go enter", go[j], "lingwu bi"]);
                         break;
                     }
                 }
@@ -301,7 +301,7 @@
                 AddContent('<hig>领悟石壁完成，苏轻将帮你寻找石破天。\n</hig>');
                 var go = exits["山洞"];
                 var say = "say " + content.lwsb;
-                SendCommand(["stopstate", go, "go out", say, "cr"]);
+                f2SendCommand(["stopstate", go, "go out", say, "cr"]);
                 setTimeout(function () { Tips(); }, 1000);
             }
             AddContent('由于领悟石壁，你的技能' + skill.name + '提升到了<hig>' + data.exp + '%</hig>！\n');
@@ -357,7 +357,7 @@
         title: title,
         room: room,
         exits: exits,
-        SendCommand: SendCommand,
+        SendCommand: f2SendCommand,
         showExtSettings: function () {
             if (typeof window.__funny2_settings !== 'undefined') {
                 window.__funny2_settings.showExtSettings();

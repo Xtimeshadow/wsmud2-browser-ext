@@ -27,9 +27,14 @@ Array.prototype.remove = function (val) {
 
 // 给所有字符串加 replaceAll(旧, 新) 方法：把字符串里所有"旧"换成"新"
 // 例："aaabbb".replaceAll("a","x")  →  "xxxbbb"
-String.prototype.replaceAll = function (s1, s2) {
-    return this.replace(new RegExp(s1, "gm"), s2);  // g=全部替换，m=多行
-};
+// 【2026-09-05 新版客户端适配】ES2021+ 浏览器已有原生 String.prototype.replaceAll，
+// 且新版游戏客户端（dist_new）内部依赖原生实现（按字面量替换，不把"旧"当正则）。
+// 仅在浏览器没有原生实现时才补我们的旧版（正则替换，语义略有差异）。
+if (!String.prototype.replaceAll) {
+    String.prototype.replaceAll = function (s1, s2) {
+        return this.replace(new RegExp(s1, "gm"), s2);  // g=全部替换，m=多行
+    };
+}
 
 // 复制文本到剪贴板（独立函数，不是原型方法）
 // 造一个隐藏 textarea → 选中 → 执行复制命令 → 删掉

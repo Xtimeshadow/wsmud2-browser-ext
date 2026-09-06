@@ -45,8 +45,8 @@ function textBecomeImg(text, fontsize, fontcolor) {
     return dataUrl;
 }
 function messageClear() {
-    $(".WG_log pre").html("");
-    // 【2026-08-11 修复】清空全部批量队列：避免残留排队消息在弹窗打开/清空日志后混入（弹窗用 .WG_log pre 作宿主）
+    $(".WG_left_log pre").html("");
+    // 【2026-08-11 修复】清空全部批量队列：避免残留排队消息在弹窗打开/清空日志后混入（弹窗用 .WG_left_log pre 作宿主）
     _msgQ['2'] = [];
     _msgQ['1'] = [];
     _msgQ['0'] = [];
@@ -75,13 +75,13 @@ function _flushMsgQ() {
         if (!arr.length) continue;
         var html = arr.join('');
         arr.length = 0;
-        var pre = a === '2' ? document.querySelector('.WG_log pre')
+        var pre = a === '2' ? document.querySelector('.WG_left_log pre')
             : a === '1' ? document.querySelector('.content-message pre')
-            : document.querySelector('.WG_log_log pre');
+            : document.querySelector('.WG_right_log pre');
         if (pre) pre.insertAdjacentHTML('beforeend', html);
     }
     // 保持原行为：右侧日志区跟随最新消息滚动到底
-    var p2 = document.querySelector('.WG_log_log pre');
+    var p2 = document.querySelector('.WG_right_log pre');
     if (p2) p2.scrollTop = 99999;
     // 【2026-08-11 超长保护】批量路径追加后裁剪检查
     _trimLogIfNeeded();
@@ -93,13 +93,13 @@ function _queueAppend(area, html) {
 }
 
 // 【2026-08-11 超长保护】日志超过阈值时裁剪最旧行——不恢复自动清空（用户要求手动清），
-// 仅防止挂机十几开 + 刷屏时 .WG_log_log pre 的 DOM 无限膨胀拖垮浏览器
+// 仅防止挂机十几开 + 刷屏时 .WG_right_log pre 的 DOM 无限膨胀拖垮浏览器
 var _LOG_MAX = 8000;      // 超过此行数触发裁剪
 var _LOG_KEEP = 1000;     // 裁剪后至少保留的行数
 var _LOG_CUT = 2000;      // 每次裁剪行数
 function _trimLogIfNeeded() {
     if (log_log_line <= _LOG_MAX) return;
-    var p3 = document.querySelector('.WG_log_log pre');
+    var p3 = document.querySelector('.WG_right_log pre');
     if (!p3) return;
     var spans = p3.querySelectorAll('span');
     if (spans.length <= _LOG_KEEP) return;
@@ -115,11 +115,11 @@ function messageAppend(m, area = 0, id = null, sync = false) {
     // 若走批量异步队列会错过绑定 → 弹窗按钮全部失效）；普通游戏消息继续走批量渲染（性能优化）
     if (area === 2) {
         if (id !== null || sync) { 
-            var target = $(".WG_log pre #" + id);
+            var target = $(".WG_left_log pre #" + id);
             if (target.length > 0) {
                 target.remove();
             } 
-            $(".WG_log pre").append('<span id="' + id + '">' + ap + '</span>');
+            $(".WG_left_log pre").append('<span id="' + id + '">' + ap + '</span>');
         } else {
             _queueAppend('2', ap);
         }
@@ -137,21 +137,21 @@ function messageAppend(m, area = 0, id = null, sync = false) {
         var now = new Date();
         var ts = '[' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0') + '] ';
         if (id !== null) {
-            var target = $(".WG_log_log pre #" + id);
+            var target = $(".WG_right_log pre #" + id);
             if (target.length > 0) {
                 target.remove();
                 log_log_line--;
             } 
             // 【2026-08-11 26.1.10】取消条数过多自动清空（原 100 行上限），改由标题栏「清除日志」按钮手动清
-            $(".WG_log_log pre").append('<span id="' + id + '">' + ts + ap + '</span>');
+            $(".WG_right_log pre").append('<span id="' + id + '">' + ts + ap + '</span>');
             log_log_line++;
-            if ($(".WG_log_log pre")[0]) $(".WG_log_log pre")[0].scrollTop = 99999;
+            if ($(".WG_right_log pre")[0]) $(".WG_right_log pre")[0].scrollTop = 99999;
             
         } else if (sync) {
             // 【2026-08-11 修复】同步路径：弹窗等需要立即可见的场景
-            $(".WG_log_log pre").append('<span>' + ts + ap + '</span>');
+            $(".WG_right_log pre").append('<span>' + ts + ap + '</span>');
             log_log_line++;
-            if ($(".WG_log_log pre")[0]) $(".WG_log_log pre")[0].scrollTop = 99999;
+            if ($(".WG_right_log pre")[0]) $(".WG_right_log pre")[0].scrollTop = 99999;
             _trimLogIfNeeded();
         } else {
             // 【2026-08-11 26.1.10】取消条数过多自动清空（原 100 行上限）

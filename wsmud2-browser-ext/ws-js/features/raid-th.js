@@ -59,7 +59,7 @@
     const THIsland = {
         outMaze: function (callback) {
             if (!Role.atPath("taohua/haitan")) {
-                Message.append("只有在 桃花岛的海滩 才能使用此虫洞。");
+                WMsg.append("只有在 桃花岛的海滩 才能使用此虫洞。");
                 return;
             }
 
@@ -104,7 +104,7 @@
         },
         zhoubotong: function (callback) {
             if (!Role.atPath("taohua/wofang")) {
-                Message.append("只有在 蓉儿的卧室 才能使用此虫洞。");
+                WMsg.append("只有在 蓉儿的卧室 才能使用此虫洞。");
                 return;
             }
 

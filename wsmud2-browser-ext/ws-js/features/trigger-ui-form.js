@@ -116,8 +116,8 @@ TriggerUI._appendHtml = function (title, content, rightText, leftText) {
         <br><br>
         ${content}
     </div>`;
-    Message.clean();
-    Message.append(html, 2);
+    WMsg.clean();
+    WMsg.append(html, 2);
 };
 
 TriggerUI._closeModal = function () {
