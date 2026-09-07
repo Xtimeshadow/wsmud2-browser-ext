@@ -77,42 +77,42 @@ window.__funny2_layout = window.__funny2_layout || {};
         };
         var toSchoolHQ = function () {
             AddContent($("<div></div>").append(
-                $('<span class="span-btn"></span>').append('<hic>' + GameState.score.family + '</hic>').click(function () { f2SendCommand('$to 后勤;$wait 500;ask1 {r门派后勤管理员}'); }),
-                $('<span class="span-btn"></span>').append("武当").click(function () { f2SendCommand('goto fam2 WUDANG'); }),
-                $('<span class="span-btn"></span>').append("少林").click(function () { f2SendCommand('goto fam2 SHAOLIN'); }),
-                $('<span class="span-btn"></span>').append("华山").click(function () { f2SendCommand('goto fam2 HUASHAN'); }),
+                $('<span class="span-btn"></span>').append('<hic>' + GameState.score.family + '</hic>').click(function () { f2SendCommand('stopstate;$to 后勤;$wait 500;ask1 {r门派后勤管理员}'); }),
+                $('<span class="span-btn"></span>').append("武当").click(function () { f2SendCommand('stopstate;goto fam2 WUDANG'); }),
+                $('<span class="span-btn"></span>').append("少林").click(function () { f2SendCommand('stopstate;goto fam2 SHAOLIN'); }),
+                $('<span class="span-btn"></span>').append("华山").click(function () { f2SendCommand('stopstate;goto fam2 HUASHAN'); }),
                 $('<br>'),
-                $('<span class="span-btn"></span>').append("峨眉").click(function () { f2SendCommand('goto fam2 EMEI'); }),
-                $('<span class="span-btn"></span>').append("逍遥").click(function () { f2SendCommand('goto fam2 XIAOYAO'); }),
-                $('<span class="span-btn"></span>').append("丐帮").click(function () { f2SendCommand('goto fam2 GAOBANG'); }),
-                $('<span class="span-btn"></span>').append("杀手").click(function () { f2SendCommand('goto fam2 SHASHOU'); }),
+                $('<span class="span-btn"></span>').append("峨眉").click(function () { f2SendCommand('stopstate;goto fam2 EMEI'); }),
+                $('<span class="span-btn"></span>').append("逍遥").click(function () { f2SendCommand('stopstate;goto fam2 XIAOYAO'); }),
+                $('<span class="span-btn"></span>').append("丐帮").click(function () { f2SendCommand('stopstate;goto fam2 GAOBANG'); }),
+                $('<span class="span-btn"></span>').append("杀手").click(function () { f2SendCommand('stopstate;goto fam2 SHASHOU'); }),
                 $('<br>')
             ));
         };
         var toSchoolMPZ = function () {
             AddContent($("<div></div>").append(
-                $('<span class="span-btn"></span>').append("逍遥").click(function () { f2SendCommand('$to 门派橙-逍遥'); }),
-                $('<span class="span-btn"></span>').append("华山").click(function () { f2SendCommand('$to 门派橙-华山'); }),
-                $('<span class="span-btn"></span>').append("武当").click(function () { f2SendCommand('$to 门派橙-武当'); }),
+                $('<span class="span-btn"></span>').append("逍遥").click(function () { f2SendCommand('stopstate;$to 门派橙-逍遥'); }),
+                $('<span class="span-btn"></span>').append("华山").click(function () { f2SendCommand('stopstate;$to 门派橙-华山'); }),
+                $('<span class="span-btn"></span>').append("武当").click(function () { f2SendCommand('stopstate;$to 门派橙-武当'); }),
                 $('<br>'),
-                $('<span class="span-btn"></span>').append("峨眉").click(function () { f2SendCommand('$to 门派橙-峨眉'); }),
-                $('<span class="span-btn"></span>').append("丐帮").click(function () { f2SendCommand('$to 门派橙-丐帮'); }),
-                $('<span class="span-btn"></span>').append("少林").click(function () { f2SendCommand('$to 门派橙-少林'); }),
+                $('<span class="span-btn"></span>').append("峨眉").click(function () { f2SendCommand('stopstate;$to 门派橙-峨眉'); }),
+                $('<span class="span-btn"></span>').append("丐帮").click(function () { f2SendCommand('stopstate;$to 门派橙-丐帮'); }),
+                $('<span class="span-btn"></span>').append("少林").click(function () { f2SendCommand('stopstate;$to 门派橙-少林'); }),
                 $('<br>'),
-                $('<span class="span-btn"></span>').append('<hig>领取奖励</hig>').click(function () { f2SendCommand('events WUDANG_settle'); })
+                $('<span class="span-btn"></span>').append('<hig>领取奖励</hig>').click(function () { f2SendCommand('stopstate;events WUDANG_settle'); })
             ));
         };
         var toSchoolJD = function () {
             AddContent($("<div></div>").append(
-                $('<span class="span-btn"></span>').append("蓬莱-观海台").click(function () { f2SendCommand('$to 蓬莱岛-观海台'); }),
-                $('<span class="span-btn"></span>').append("蓬莱-石碑").click(function () { f2SendCommand('$to 蓬莱岛-石碑'); }),
-                $('<span class="span-btn"></span>').append("蓬莱-姜卫").click(function () { f2SendCommand('$to 蓬莱岛-姜卫'); }),
+                $('<span class="span-btn"></span>').append("蓬莱-观海台").click(function () { f2SendCommand('stopstate;$to 蓬莱岛-观海台'); }),
+                $('<span class="span-btn"></span>').append("蓬莱-石碑").click(function () { f2SendCommand('stopstate;$to 蓬莱岛-石碑'); }),
+                $('<span class="span-btn"></span>').append("蓬莱-姜卫").click(function () { f2SendCommand('stopstate;$to 蓬莱岛-姜卫'); }),
                 $('<br>'),
-                $('<span class="span-btn"></span>').append("药王谷-鉴宝阁").click(function () { f2SendCommand('$to 药王谷-鉴宝阁;$wait 500;list {r拍卖师}'); }),
-                $('<span class="span-btn"></span>').append("药王谷-炼丹房").click(function () { f2SendCommand('$to 药王谷-炼丹房'); }),
-                $('<span class="span-btn"></span>').append("药王谷-藏书楼").click(function () { f2SendCommand('$to 药王谷-藏书楼'); }),
+                $('<span class="span-btn"></span>').append("药王谷-鉴宝阁").click(function () { f2SendCommand('stopstate;$to 药王谷-鉴宝阁;$wait 500;list {r拍卖师}'); }),
+                $('<span class="span-btn"></span>').append("药王谷-炼丹房").click(function () { f2SendCommand('stopstate;$to 药王谷-炼丹房'); }),
+                $('<span class="span-btn"></span>').append("药王谷-藏书楼").click(function () { f2SendCommand('stopstate;$to 药王谷-藏书楼'); }),
                 $('<br>'),
-                $('<span class="span-btn"></span>').append("蜀山-祖师殿").click(function () { f2SendCommand('$to 蜀山-祖师殿'); })
+                $('<span class="span-btn"></span>').append("古大陆-守墓老人").click(function () { f2SendCommand('stopstate;jh ar 9 start'); })
             ));
         };
         var toSchoolBP = function () {
@@ -132,33 +132,37 @@ window.__funny2_layout = window.__funny2_layout || {};
                 $('<hic class="span-btn"></hic>').append("统计").click(function () { f2SendCommand("info"); }),
                 $('<hic class="span-btn"></hic>').append("换组").click(checkEq),
                 $('<hic class="span-btn"></hic>').append("扩展").click(openExtend),
-                $('<hic class="span-btn"></hic>').append("回复").click(function () { ToRaid.perform("@renew"); }),
-                $('<hic class="span-btn"></hic>').append("挂机").click(function () { WG.zdwk(); })
+                $('<hic class="span-btn"></hic>').append("设置").click(function () { if (window.WG && WG.setting) { WG.setting(); } else { DungeonsShortcuts.extension_setting(); } }),
+                $('<hic class="span-btn"></hic>').append("挂机").click(function () { WG.zdwk(); }),
+                $('<hic class="span-btn"></hic>').append("庙回").click(function () { ToRaid.perform("//~silent\n@cmdDelay 0\nstopstate\n@renew"); }),
+                $('<hic class="span-btn"></hic>').append("塔回").click(function () { ToRaid.perform("//~silent\n@cmdDelay 0\nstopstate\n($force_name) = (:kf_nei)\nenable force none\n$stoppfm\nenable force (force_name)\ngoto wd1\n@await 1000\n@until (:free) == true && (:room) == 武道塔-塔顶\n@print <hio>武道回血完成！</hio>"); })
             ),
             $("<div></div>").append(
+                $('<hig class="span-btn"></hig>').append("当铺").click(function () { f2SendCommand('stopstate;$to 扬州城-当铺;$wait 200;list {r唐楠};'); }),
+                $('<hig class="span-btn"></hig>').append("赌场").click(function () { f2SendCommand('stopstate;$to 扬州城-赌场;$wait 200;duihuan2;ask3 {r易直非}'); }),
+                $('<hig class="span-btn"></hig>').append("后勤").click(toSchoolHQ),
+                $('<hig class="span-btn"></hig>').append("词条").click(function () { f2SendCommand("stopstate;duihuan3"); }),
+                $('<hig class="span-btn"></hig>').append("衙门").click(function () { f2SendCommand('stopstate;$to 扬州城-衙门正厅'); }),
                 $('<hig class="span-btn"></hig>').append("师父").click(function () { f2SendCommand("stopstate;goto fam1"); }),
                 $('<hig class="span-btn"></hig>').append("木人").click(function () { f2SendCommand("stopstate;$to 少林派-西侧殿"); }),
-                $('<hig class="span-btn"></hig>').append("随从").click(dzsc),
-                $('<hig class="span-btn"></hig>').append("门战").click(toSchoolMPZ),
-                $('<hig class="span-btn"></hig>').append("后勤").click(toSchoolHQ),
-                $('<hig class="span-btn"></hig>').append("禁地").click(toSchoolJD),
-                $('<hig class="span-btn"></hig>').append("帮会").click(toSchoolBP),
-                $('<hig class="span-btn"></hig>').append("武道").click(function () { f2SendCommand('stopstate;jh fam 9 start;go enter'); })
             ),
             $("<div></div>").append(
                 $('<hiz class="span-btn"></hiz>').append("仓库").click(function () { f2SendCommand("store"); }),
-                $('<hiz class="span-btn"></hiz>').append("当铺").click(function () { f2SendCommand('stopstate;$to 扬州城-当铺;$wait 200;list {r唐楠};'); }),
-                $('<hiz class="span-btn"></hiz>').append("衙门").click(function () { f2SendCommand('stopstate;$to 扬州城-衙门正厅'); }),
-                $('<hiz class="span-btn"></hiz>').append("回家").click(function () { f2SendCommand('stopstate;$to 住房-院子'); }),
-                $('<hiz class="span-btn"></hiz>').append("花园").click(function () { f2SendCommand('stopstate;$to 住房-小花园'); }),
-                $('<hiz class="span-btn"></hiz>').append("练功").click(function () { f2SendCommand('stopstate;$to 住房-练功房'); })
+                $('<hiz class="span-btn"></hiz>').append("随从").click(dzsc),
+                $('<hiz class="span-btn"></hiz>').append("清包").click(function () { ToRaid.perform("@tidyBag"); }),
+                $('<hiz class="span-btn"></hiz>').append("门战").click(toSchoolMPZ),
+                $('<hiz class="span-btn"></hiz>').append("拍卖").click(function () { f2SendCommand('pm list'); }),
+                $('<hiz class="span-btn"></hiz>').append("练功").click(function () { f2SendCommand('stopstate;$to 住房-练功房'); }),
+                $('<hiz class="span-btn"></hiz>').append("塔顶").click(function () { f2SendCommand('stopstate;jh fam 9 start;go enter'); })
             ),
             $("<div></div>").append(
                 $('<hio class="span-btn"></hio>').append("隐藏").click(hideLeftRight),
                 $('<hio class="span-btn"></hio>').append("清屏").click(clearRightMsg),
                 $('<hio class="span-btn"></hio>').append("工具").click(function () { openExtensionHtml(); }),
                 $('<hio class="span-btn"></hio>').append("攻略").click(function () { window.open("https://ucn595zz2fou.feishu.cn/wiki/JvEZw8bEiiIpf3kQiFJcAwbanji", "_blank"); }),
-                $('<hio class="span-btn"></hio>').append("切换").click(toggleLeftRight)
+                $('<hio class="span-btn"></hio>').append("切换").click(toggleLeftRight),
+                $('<hio class="span-btn"></hio>').append("禁地").click(toSchoolJD),
+                $('<hio class="span-btn"></hio>').append("帮会").click(toSchoolBP)
             ),
             $("<div></div>")
         );
@@ -192,7 +196,7 @@ window.__funny2_layout = window.__funny2_layout || {};
             function loadEq() {
                 var index = $(this).attr("eq");
                 var name = ["技能装备组一", "技能装备组二", "技能装备组三"];
-                f2SendCommand(['eqgroup ' + index, 'skgroup ' + index]);
+                f2SendCommand(['stopstate', 'eqgroup ' + index, 'skgroup ' + index]);
                 AddContent('<hir>已一键更换<hiw>' + name[index] + '</hiw>！</hir>\n');
             }
             function check() {

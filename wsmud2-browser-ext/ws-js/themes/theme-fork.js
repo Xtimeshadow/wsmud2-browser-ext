@@ -348,8 +348,8 @@
     addThemeStyle(`
       /* WG_right_log 字体继承游戏 */
       .WG_right_log > pre { font-family: inherit !important; font-size: inherit !important; }
-      /* 日志区 WG_right_log 内部 pre 也继承游戏字体 */
-      .right > .WG_right_log pre { font-family: inherit !important; font-size: inherit !important; color: #c0c0c0 !important; line-height: 1.65 !important; }
+      /* 日志区 WG_right_log 内部 pre 也继承游戏字体（不设 line-height，与主题1的默认紧凑行距保持一致） */
+      .right > .WG_right_log pre { font-family: inherit !important; font-size: inherit !important; color: #c0c0c0 !important; }
       .content-message pre { font-family: inherit !important; font-size: inherit !important; line-height: 1.65 !important; }
     `);
 

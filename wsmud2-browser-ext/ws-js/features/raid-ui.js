@@ -568,7 +568,6 @@ const RaidUI = {
             { name: "古宗门寻路", action: function () { WG.SendCmd('stopstate'); DungeonsShortcuts.extension_guzongmen(); } },
             { name: "慈航七重门", action: function () { WG.SendCmd('stopstate'); DungeonsShortcuts.extension_cihang(); } },
             { name: "战神殿解谜", action: function () { WG.SendCmd('stopstate'); DungeonsShortcuts.extension_zhanshendian(); } },
-            { name: "扫荡妖塔", action: function () { DungeonsShortcuts.extension_sdyt(); } },
             { name: "一键妖塔", action: function () { DungeonsShortcuts.extension_yjyt(); } },
             { name: "参数设置", action: function () { if (window.WG && WG.setting) { WG.setting(); } else { DungeonsShortcuts.extension_setting(); } } }
         ];

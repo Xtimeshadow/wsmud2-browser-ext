@@ -241,20 +241,32 @@ Object.assign(GlobalInit, {
                 break
             case "text":
                 if (data.msg.indexOf("今日副本次数") >= 0 && data.msg.indexOf("BOSS挑战") >= 0) {
-                    const info = data.msg;
-                    const regex = /武道塔进度\d+层，已累积(\d+)份奖励\n武道残页总量\d+\n门派职位等级[^，\n]+，已累积(\d+)份师门物资\n衙门职位等级[^，\n]+，已累积(\d+)份奖励\n今日副本次数(\d+)\/20\nBOSS挑战(\d+)\/5\n([^，\n]+)\n(获取圣元碎片(\d+)\/1\n)?(获取帝魄碎片(\d+)\/1\n)?获取额外(\d+)\/(\d+)师门功绩\n本周已经获取襄阳军功(\d+)\/(\d+)\n已领取(\d+)\/(\d+)奖励军功/;
-                    const matches = info.match(regex);
-                    if (!matches) { return; }
+                    // 【2026-09-06 修复】原为整段正则匹配，服务器改动（如新增"今日已收获门派战战利品"行）
+                    // 会打破固定顺序导致静默失败。改为逐行解析：拆行后逐行提取各字段，缺失/新增行互不影响。
                     const result = {
-                        wudao: parseInt(matches[1], 10), shimen: parseInt(matches[2], 10),
-                        yamen: parseInt(matches[3], 10), fuben: parseInt(matches[4], 10),
-                        boss: parseInt(matches[5], 10), qingan: matches[6] === '尚未请安',
-                        shengyuan: matches[8] ? parseInt(matches[8], 10) : -1,
-                        dipo: matches[10] ? parseInt(matches[10], 10) : -1,
-                        gongji: { cur: parseInt(matches[11], 10), max: parseInt(matches[12], 10) },
-                        jungong: { cur: parseInt(matches[13], 10), max: parseInt(matches[14], 10) },
-                        jungong1: parseInt(matches[15], 10)
+                        wudao: -1, shimen: -1, yamen: -1, fuben: -1, boss: -1,
+                        qingan: null, shengyuan: -1, dipo: -1,
+                        gongji: null, jungong: null, jungong1: -1
                     };
+                    const lines = data.msg.split('\n');
+                    for (const line of lines) {
+                        const L = line.trim();
+                        if (!L) continue;
+                        let m;
+                        if ((m = L.match(/^武道塔进度\d+层，已累积(\d+)份奖励$/))) result.wudao = parseInt(m[1], 10);
+                        else if ((m = L.match(/^门派职位等级[^，\n]+，已累积(\d+)份师门物资$/))) result.shimen = parseInt(m[1], 10);
+                        else if ((m = L.match(/^衙门职位等级[^，\n]*，已累积(\d+)份奖励$/))) result.yamen = parseInt(m[1], 10);
+                        else if ((m = L.match(/^今日副本次数(\d+)\/20$/))) result.fuben = parseInt(m[1], 10);
+                        else if ((m = L.match(/^BOSS挑战(\d+)\/5$/))) result.boss = parseInt(m[1], 10);
+                        else if (L === '尚未请安') result.qingan = true;
+                        else if (L === '已经门派请安') result.qingan = false;
+                        else if ((m = L.match(/^获取圣元碎片(\d+)\/1$/))) result.shengyuan = parseInt(m[1], 10);
+                        else if ((m = L.match(/^获取帝魄碎片(\d+)\/1$/))) result.dipo = parseInt(m[1], 10);
+                        else if ((m = L.match(/^获取额外(\d+)\/(\d+)师门功绩$/))) result.gongji = { cur: parseInt(m[1], 10), max: parseInt(m[2], 10) };
+                        else if ((m = L.match(/^本周已经获取襄阳军功(\d+)\/(\d+)$/))) result.jungong = { cur: parseInt(m[1], 10), max: parseInt(m[2], 10) };
+                        else if ((m = L.match(/^已领取(\d+)\/(\d+)奖励军功$/))) result.jungong1 = parseInt(m[1], 10);
+                        // 其余行（角色名/武道残页/战利品等）忽略
+                    }
                     if (result.wudao > 5) { messageAppend(`<hir>武道塔累积${result.wudao}天，请尽快领取</hir>`); }
                     if (result.shimen > 48) { messageAppend(`<hir>师门累积${result.shimen}份，请尽快领取</hir>`); }
                     if (result.yamen > 48) { messageAppend(`<hir>衙门累积${result.yamen}份，请尽快领取</hir>`); }
@@ -270,10 +282,11 @@ Object.assign(GlobalInit, {
                     if (result.qingan) { WG.SendCmd('sx greet'); messageAppend(`<hiy>未请安，已自动请安</hiy>`); }
                     if (result.shengyuan === 0) { messageAppend(`<hir>圣元碎片未获取，请尽快获取</hir>`); }
                     if (result.dipo === 0) { messageAppend(`<hir>帝魄碎片未获取，请尽快获取</hir>`); }
-                    if (result.gongji.cur < result.gongji.max) { messageAppend(`<hir>门派战功绩未满，请尽快获取</hir>`); }
-                    if (result.jungong.cur < result.jungong.max) { messageAppend(`<hir>军功未满，请尽快获取</hir>`); }
+                    if (result.gongji && result.gongji.cur < result.gongji.max) { messageAppend(`<hir>门派战功绩未满，请尽快获取</hir>`); }
+                    if (result.jungong && result.jungong.cur < result.jungong.max) { messageAppend(`<hir>军功未满，请尽快获取</hir>`); }
                     if (result.jungong1 == 0) { messageAppend(`<hir>胜利军功未领取，请尽快领取</hir>`); }
-                    if (result.fuben >= 20 && result.boss >= 5 && !result.qingan && result.shengyuan !== 0 && result.dipo !== 0 && result.gongji.cur >= result.gongji.max) {
+                    if (result.gongji && result.jungong && result.qingan != null &&
+                        result.fuben >= 20 && result.boss >= 5 && !result.qingan && result.shengyuan !== 0 && result.dipo !== 0 && result.gongji.cur >= result.gongji.max) {
                         messageAppend(`<hig>今日任务全部完成!</hig>`);
                     }
                 }
