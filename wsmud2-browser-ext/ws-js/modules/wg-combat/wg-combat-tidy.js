@@ -32,9 +32,11 @@ Object.assign(WG, {
             const present = WG._tidyPresentNames(autoUseList);
             if (present.length === 0) { try { if (stepLog) stepLog("当前无需自动使用"); } catch (e) { } resolve(); return; }
             try { if (stepLog) stepLog("自动使用：" + present.join("、")); } catch (e) { }
-            let source = "//~silent\n@cmdDelay 0\npack\n";
+            // 【2026-09-06 限速】@cmdDelay/@await 由 0/100 提至 300：
+            // 服务器每心跳(约5秒)最多 20 条命令，100ms 间隔会瞬间打爆限制触发"不要急，慢慢来"
+            let source = "//~silent\n@cmdDelay 300\npack\n";
             names.forEach(function (name) {
-                source += "[while] {b(" + name + ")}? != null\n    use {b(" + name + ")}\n    @await 100\n";
+                source += "[while] {b(" + name + ")}? != null\n    use {b(" + name + ")}\n    @await 300\n";
             });
             if (!(unsafeWindow && unsafeWindow.ToRaid && unsafeWindow.ToRaid.perform)) { resolve(); return; }
             unsafeWindow.ToRaid.perform(source, "自动使用(整理包裹)", false);
@@ -98,7 +100,12 @@ Object.assign(WG, {
                 if (idx >= items.length) { finish(); return; }
                 const it = items[idx]; idx++;
                 moving = true;
-                WG.SendCmd(`give {r${fname}} ${it.id};dc {r${fname}} fenjie ${it.id};`);
+                // 【2026-09-06 限速】give 与 dc 分两条发送并间隔 300ms：
+                // 原写法同串连发，服务器响应快时瞬间打满 20 条/心跳上限触发"不要急，慢慢来"
+                WG.SendCmd(`give {r${fname}} ${it.id};`);
+                WG._tapSched(function () {
+                    WG.SendCmd(`dc {r${fname}} fenjie ${it.id};`);
+                }, 300);
                 moveTimer = WG._tapSched(function () { moving = false; next(); }, 2000);
             };
             hookId = WG.add_hook("text", function (data) {
@@ -120,9 +127,10 @@ Object.assign(WG, {
             const present = WG._tidyPresentNames(autoSellList);
             if (present.length === 0) { try { if (stepLog) stepLog("当前无需按清单售卖"); } catch (e) { } resolve(); return; }
             try { if (stepLog) stepLog("按清单售卖：" + present.join("、")); } catch (e) { }
-            let source = "//~silent\n@cmdDelay 0\npack\n";
+            // 【2026-09-06 限速】同 tidyBlockUse：300ms 间隔，避免触发服务器"不要急，慢慢来"
+            let source = "//~silent\n@cmdDelay 300\npack\n";
             names.forEach(function (name) {
-                source += "[while] {b(" + name + ")}? != null\n    sell {b(" + name + ")}\n    @await 100\n";
+                source += "[while] {b(" + name + ")}? != null\n    sell {b(" + name + ")}\n    @await 300\n";
             });
             if (!(unsafeWindow && unsafeWindow.ToRaid && unsafeWindow.ToRaid.perform)) { resolve(); return; }
             unsafeWindow.ToRaid.perform(source, "自动售卖(整理包裹)", false);
@@ -149,8 +157,9 @@ Object.assign(WG, {
                 return;
             }
             try { if (stepLog) stepLog("分解装备：" + names.join("、")); } catch (e) { }
+            // 【2026-09-06 限速】$wait 400→500：分解命令间隔略提，留出心跳余量防"不要急，慢慢来"
             let cmd = "";
-            items.forEach(function (it) { cmd += `fenjie ${it.id};$wait 400;`; });
+            items.forEach(function (it) { cmd += `fenjie ${it.id};$wait 500;`; });
             WG.SendCmd(cmd);
             const start = Date.now();
             (function poll() {

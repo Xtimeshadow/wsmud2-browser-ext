@@ -19,6 +19,10 @@
 var skillCDTimers = new Map();
 var buffTimers = new Map();
 
+// BUFF 显示防抖表（key → setTimeout id）：合并 100ms 内同一 BUFF 的重复推送，
+// 避免每次推送都"移除旧倒计时→重新渲染"导致图标闪烁
+var _buffDebounce = {};
+
 // 获取BUFF定时器的组合键
 function getBuffTimerKey(sid, id) {
     return `${sid}-${id}`;
@@ -41,11 +45,21 @@ function _displayText(entry) {
 }
 
 // 渲染一个登记项：文本没变就不动 DOM（长 CD 每秒只写一次，不再 5 次/秒）
+// 【2026-09-07 修复闪烁】BUFF 不再整体重写 .status-item 的 innerHTML（会销毁重建元素，
+// 且会把游戏 lastChild 进度条 shadow 一起重建），改为独立 .buff-cd 浮层：首次创建一次，
+// 之后每次只更新浮层内容；若浮层被游戏 StatusItem_refresh 重写冲掉则自动重建。
 function _renderEntry(entry) {
     var text = _displayText(entry);
     var elements = document.querySelectorAll(entry.selector);
     var found = elements.length > 0;
-    if (text === entry.lastText && !(entry._missing && found)) return;
+    // BUFF 浮层被冲掉（文本未变但 span 缺失，如游戏刷新层数重写了 innerHTML）时也必须重绘
+    var cdOK = true;
+    if (entry.kind === 'buff' && found) {
+        for (var i = 0; i < elements.length; i++) {
+            if (!elements[i].querySelector('.buff-cd')) { cdOK = false; break; }
+        }
+    }
+    if (text === entry.lastText && !(entry._missing && found) && cdOK) return;
     entry.lastText = text;
     entry._missing = !found;
     elements.forEach((el) => {
@@ -60,28 +74,32 @@ function _renderEntry(entry) {
             }
             float.innerHTML = '<' + (entry.colorTag || 'hir') + '>' + text + 's</' + (entry.colorTag || 'hir') + '>';
         } else {
-            // BUFF：内文追加剩余时间（保持原实现的行为）
-            const shadowElement = el.querySelector('.shadow');
-            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-            el.innerHTML = `${entry.originalText}<${entry.colorTag}>${text}s</${entry.colorTag}>${shadowStyle}`;
+            // BUFF：独立倒计时浮层。必须插在 shadow（游戏进度条，lastChild）之前，
+            // 否则会变成 lastChild，被游戏 StatusItemANI/StatusItem_refresh 误当作进度条处理
+            let cd = el.querySelector('.buff-cd');
+            if (!cd) {
+                cd = document.createElement('span');
+                cd.className = 'buff-cd';
+                const shadowEl = el.querySelector('.shadow');
+                if (shadowEl) el.insertBefore(cd, shadowEl);
+                else el.appendChild(cd);
+            }
+            cd.innerHTML = '<' + (entry.colorTag || 'hig') + '>' + text + 's</' + (entry.colorTag || 'hig') + '>';
         }
     });
 }
 
-// 倒计时结束的还原：技能移除浮层；BUFF 恢复原始文本
-// 【2026-08-14 修复】BUFF 到期改为"名字 + shadow 星标"一起恢复（原实现只恢复名字，
-// 与 clearBuffDisplay 的行为不一致，会把 buff 的 shadow 星标弄丢）
+// 倒计时结束的还原：技能移除浮层；BUFF 移除倒计时浮层（原 innerHTML 从未被改动，
+// 名字/shadow 一直由游戏自己维护，无需恢复）
 function _restoreEntry(entry) {
     const elements = document.querySelectorAll(entry.selector);
     elements.forEach((el) => {
         if (entry.kind === 'skill') {
             const f = el.querySelector('.cd-overlay');
             if (f) f.remove();
-        } else if (el.originalText) {
-            const shadowElement = el.querySelector('.shadow');
-            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-            el.innerHTML = `${el.originalText}${shadowStyle}`;
-            el.originalText = null;
+        } else {
+            const cd = el.querySelector('.buff-cd');
+            if (cd) cd.remove();
         }
     });
 }
@@ -129,6 +147,11 @@ function clearSkillCDDisplay(id) {
 function clearBuffDisplay(sid, id) {
     const key = getBuffTimerKey(sid, id);
 
+    // 同时取消尚未执行的防抖延迟，避免 buff 移除后倒计时"复活"
+    if (_buffDebounce[key]) {
+        clearTimeout(_buffDebounce[key]);
+        delete _buffDebounce[key];
+    }
     if (buffTimers.has(key)) {
         buffTimers.delete(key);
     }
@@ -136,13 +159,8 @@ function clearBuffDisplay(sid, id) {
     const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
 
     elements.forEach((el) => {
-        if (el.originalText) {
-            const shadowElement = el.querySelector('.shadow');
-            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-
-            el.innerHTML = `${el.originalText}${shadowStyle}`;
-            el.originalText = null;
-        }
+        const cd = el.querySelector('.buff-cd');
+        if (cd) cd.remove();
     });
 }
 
@@ -150,16 +168,17 @@ function clearBuffDisplay(sid, id) {
 function clearAllBuffTimers() {
     buffTimers.clear();
 
-    // 恢复原始文本
+    // 取消所有挂起的防抖延迟
+    for (const k in _buffDebounce) {
+        clearTimeout(_buffDebounce[k]);
+    }
+    _buffDebounce = {};
+
+    // 移除所有倒计时浮层（名字/shadow 由游戏维护，不动）
     const allStatusItems = document.querySelectorAll('.status-item');
     allStatusItems.forEach((el) => {
-        if (el.originalText) {
-            const shadowElement = el.querySelector('.shadow');
-            const shadowStyle = shadowElement ? shadowElement.outerHTML : '';
-
-            el.innerHTML = `${el.originalText}${shadowStyle}`;
-            el.originalText = null;
-        }
+        const cd = el.querySelector('.buff-cd');
+        if (cd) cd.remove();
     });
 }
 
@@ -200,39 +219,31 @@ function showBuffDuration(sid, duration, id, count = 0, overtime = 0) {
     // 只有当buffCD为"开"时才执行
     // 【2026-08-15 移植上游 26.2】开关兼容 true / 'true'
     if (buffCD !== "开" && buffCD !== true && buffCD !== 'true') return;
-    // 延时100毫秒，等待元素刷新
-    setTimeout(() => {
+
+    const key = getBuffTimerKey(sid, id);
+
+    // 【2026-09-07 防抖】战斗中同一 BUFF 会被高频推送（items/status），100ms 内只保留
+    // 最后一次处理，避免反复"移除旧浮层→重渲染"造成的图标高频闪烁
+    if (_buffDebounce[key]) {
+        clearTimeout(_buffDebounce[key]);
+    }
+    _buffDebounce[key] = setTimeout(() => {
+        delete _buffDebounce[key];
+
+        // 延时100毫秒，等待元素刷新
         const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
 
         if (elements.length === 0) {ExtLog.warn(`找不到BUFF元素: sid=${sid}, id=${id}`);return;}
 
         clearBuffDisplay(sid, id);
 
-        let newOriginalText = '';
-        elements.forEach((el) => {
-            // 清除之前的计时显示，恢复原始内容
-            if (el.originalText) {
-                el.innerHTML = el.originalText;
-            }
-            // 保存当前的原始内容（不包含计时）
-            newOriginalText = el.firstChild ? el.firstChild.nodeValue.trim() : el.textContent.trim();
-            el.originalText = newOriginalText;
-        });
-
-        // 处理refresh BUFF的层数（与原实现一致）
-        let finalOriginalText = elements[0].originalText;
-        if (count > 0) {
-            finalOriginalText = finalOriginalText.replace(/x\d+$/, '') + `x${count}`;
-        }
-
-        // 登记倒计时（原 totalSeconds=(duration+100)/1000，remaining 同理）
-        const key = getBuffTimerKey(sid, id);
+        // 登记倒计时（原 totalSeconds=(duration+100)/1000，remaining 同理）。
+        // 层数显示由游戏 StatusItem_add/StatusItem_refresh 维护，这里不再拼写 originalText
         buffTimers.set(key, {
             kind: 'buff',
             selector: `.room-item[itemid="${id}"] .status-item[sid="${sid}"]`,
             remaining: (duration + 100) - (overtime || 0),
             colorTag: buffCDColor,
-            originalText: finalOriginalText,
             lastText: null,
             _missing: false
         });

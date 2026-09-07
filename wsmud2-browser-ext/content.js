@@ -245,10 +245,9 @@
         "ws-js/core/ws.js",
         "ws-js/core/login-core.js",
         "ws-js/core/login-methods.js",
-        "ws-js/core/wslogin.js",
-        "ws-js/core/wslogin-crypto.js",
-        "ws-js/core/wslogin-ui.js",
-        "ws-js/core/wslogin-flow.js",
+        // 【2026-09-06 修复】wslogin 系列不排除：它们用独立命名空间（window.__AccountHelper），
+        // 不覆盖新客户端全局；且老角色面板 #role_panel 由 legacy-page 注入，一键登录可正常工作。
+        // wslogin-crypto 定义 _encryptPassword/_decryptPassword 裸全局函数，风险极低。
         // --- 对话框面板（新客户端自带 Dialog）---
         "ws-js/modules/dialog/dialog-base.js",
         "ws-js/modules/dialog/dialog-base-utils.js",
