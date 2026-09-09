@@ -32,6 +32,8 @@
         // 注入核心样式
         GM_addStyle(_getZdyItemCSS());
         GM_addStyle(_getCodeFontCSS());
+        // 【2026-09-07 全面重设计】触发/流程/自命令 弹窗设计系统样式
+        GM_addStyle(_getDialogCSS());
 
         // 初始化角色配置
         GlobalInit.configInit();

@@ -34,9 +34,9 @@ function createRaidEditor(textareaId, options) {
 
     var highlight = document.createElement('pre');
     highlight.className = 'raid-editor-highlight';
-    highlight.style.cssText = 'position:absolute;top:0;left:37px;right:0;bottom:0;margin:0;padding:6px 8px;overflow:auto;font-size:0.8em;font-family:JetBrains Mono,monospace;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;background:#1a1a2e;color:#ccc;pointer-events:none;z-index:1;border:1px solid #555;border-radius:4px;text-align:left;box-sizing:border-box;';
+    highlight.style.cssText = 'position:absolute;top:0;left:37px;right:0;bottom:0;margin:0;padding:6px 8px;overflow:auto;font-size:0.8em;font-family:JetBrains Mono,monospace;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;background:#1a1a2e;color:#ccc;pointer-events:none;z-index:1;border:1px solid #6b6b9c;border-radius:4px;text-align:left;box-sizing:border-box;box-shadow:0 0 10px rgba(0,0,0,.45);';
 
-    textarea.style.cssText = 'display:block;position:absolute;left:37px;top:0;right:0;bottom:0;width:auto;height:auto;margin:0;padding:6px 8px;font-size:0.8em;font-family:JetBrains Mono,monospace;line-height:1.4;background:transparent;color:transparent;caret-color:#fff;z-index:2;border:1px solid #555;border-radius:4px;resize:none;outline:none;overflow:auto;text-align:left;box-sizing:border-box;';
+    textarea.style.cssText = 'display:block;position:absolute;left:37px;top:0;right:0;bottom:0;width:auto;height:auto;margin:0;padding:6px 8px;font-size:0.8em;font-family:JetBrains Mono,monospace;line-height:1.4;background:transparent;color:transparent;caret-color:#fff;z-index:2;border:1px solid #6b6b9c;border-radius:4px;resize:none;outline:none;overflow:auto;text-align:left;box-sizing:border-box;';
 
     textarea.parentNode.insertBefore(container, textarea);
     container.appendChild(gutter);

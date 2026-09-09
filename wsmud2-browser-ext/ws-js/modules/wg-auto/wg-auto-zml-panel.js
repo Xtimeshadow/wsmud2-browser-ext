@@ -31,49 +31,8 @@ Object.assign(WG, {
         var area = ['80vw', '75vh'];
         var html = UI.zmlandztjkui;
         var title = '自命令';
-
-        // 注入样式：关闭按钮白色、按钮统一样式、交换动画
-        if (!document.getElementById('zml-panel-style')) {
-            var $style = $('<style id="zml-panel-style"></style>');
-            $style.text(
-                '#zmlandztjk .zml-btn {' +
-                '  display:inline-block;padding:2px 10px;border:1px solid #555;border-radius:4px;' +
-                '  background:#14141f;cursor:pointer;font-size:12px;text-align:center;margin:0 2px;' +
-                '  white-space:nowrap;' +
-                '}' +
-                '#zmlandztjk .zml-btn:hover {opacity:0.8;}' +
-                '#zmlandztjk .zml-btn-run {border-color:#8cf;color:#8cf;}' +
-                '#zmlandztjk .zml-btn-edit {border-color:#888;color:#ccc;}' +
-                '#zmlandztjk .zml-btn-quick {border-color:#8c8;color:#8c8;}' +
-                '#zmlandztjk .zml-btn-quick-off {border-color:#555;color:#888;}' +
-                '#zmlandztjk .zml-btn-move {border-color:#555;color:#aaa;}' +
-                '#zmlandztjk .zml-btn-action {border-color:#555;color:#aaa;}' +
-                '#zmlandztjk .zml-btn-add {border-color:#8cf;color:#8cf;padding:3px 14px;}' +
-                '#zmlandztjk .zml-move-wrap {display:flex;width:90px;}' +
-                '#zmlandztjk .zml-move-wrap .zml-btn-move {flex:1;margin:0;}' +
-                '#zmlandztjk .zml-move-wrap .zml-btn-move:first-child {border-radius:4px 0 0 4px;}' +
-                '#zmlandztjk .zml-move-wrap .zml-btn-move:last-child {border-radius:0 4px 4px 0;}' +
-                /* 交换动画：transition-group */
-                '.zml-flip-move {transition:transform 0.25s ease;}' +
-                '.zml-flip-enter-active {transition:all 0.25s ease;}' +
-                '.zml-flip-leave-active {transition:all 0.25s ease;position:absolute;}' +
-                '.zml-flip-enter {opacity:0;transform:translateY(-10px);}' +
-                '.zml-flip-leave-to {opacity:0;transform:translateY(10px);}'
-            );
-            $('head').append($style);
-        }
-
-        // 设置关闭按钮白色
-        var closeBtnStyle = document.getElementById('zml-close-btn-style');
-        if (!closeBtnStyle) {
-            closeBtnStyle = document.createElement('style');
-            closeBtnStyle.id = 'zml-close-btn-style';
-            closeBtnStyle.textContent =
-                '.layui-layer-setwin .layui-layer-close1 { background: none !important; text-decoration:none !important; outline:none; border-bottom:none !important; }' +
-                '.layui-layer-setwin .layui-layer-close1:before { content:"\\2716"; font-size:16px; color:#fff; text-decoration:none !important; }' +
-                '.layui-layer-setwin .layui-layer-close1:hover:before { opacity:0.7; }';
-            document.head.appendChild(closeBtnStyle);
-        }
+        // 【2026-09-07】zml-btn 按钮、交换动画、layer 关闭按钮等样式已并入设计系统
+        //   （wg-core-styles.js _getDialogCSS()，登录时注入），此处不再运行时注入。
 
         WG._zmlLayerIndex = layer.open({
             type: 1,
@@ -134,6 +93,15 @@ Object.assign(WG, {
                 zmlShowBtnCls: function (item) {
                     return item.zmlShow ? 'zml-btn zml-btn-quick' : 'zml-btn zml-btn-quick-off';
                 },
+                // ===== 代码编辑器（与触发/流程编辑区一致：Tab 缩进 + 行号/语法高亮/自动补全） =====
+                _setupEditor: function (id) {
+                    setTimeout(function () {
+                        var ta = document.getElementById(id);
+                        if (!ta) return;
+                        try { enableTabIndent(ta); } catch (e) { }
+                        try { createRaidEditor(id, { height: '100%' }); } catch (e2) { }
+                    }, 0);
+                },
                 // ===== ZML 列表操作 =====
                 runZml: function (v) {
                     WG.zmlfire(v);
@@ -146,11 +114,13 @@ Object.assign(WG, {
                     };
                     this.editingIdx = this.zmldata.indexOf(item);
                     this.cv = 'zmlEdit';
+                    this._setupEditor('zml_info');
                 },
                 addZml: function () {
                     this.editForm = { name: '', zmlType: '0', zmlRun: '' };
                     this.editingIdx = -1;
                     this.cv = 'zmlEdit';
+                    this._setupEditor('zml_info');
                 },
                 moveZml: function (idx, dir) {
                     var target = idx + dir;
@@ -193,7 +163,11 @@ Object.assign(WG, {
                     SettingsStore.getShareJson(id, function (res) {
                         var v = JSON.parse(res.json);
                         if (v.zmlRun != undefined) {
+                            // 【2026-09-08】查询分享移至列表页：导入后作为新增进入编辑视图
                             self.editForm = v;
+                            self.editingIdx = -1;
+                            self.cv = 'zmlEdit';
+                            self._setupEditor('zml_info');
                         } else {
                             LayerHelper.msg('不合法');
                         }
@@ -215,11 +189,13 @@ Object.assign(WG, {
                     };
                     this.editingIdx = this.ztjkdata.indexOf(item);
                     this.cv = 'ztjkEdit';
+                    this._setupEditor('ztjk_script');
                 },
                 addZtjk: function () {
                     this.editZtjkForm = { name: '', script: '', isactive: 1 };
                     this.editingIdx = -1;
                     this.cv = 'ztjkEdit';
+                    this._setupEditor('ztjk_script');
                 },
                 moveZtjk: function (idx, dir) {
                     var target = idx + dir;
@@ -271,7 +247,11 @@ Object.assign(WG, {
                     SettingsStore.getShareJson(id, function (res) {
                         var v = JSON.parse(res.json);
                         if (v.script !== undefined) {
+                            // 【2026-09-08】查询分享移至监控列表页：导入后作为新增进入编辑视图
                             self.editZtjkForm = v;
+                            self.editingIdx = -1;
+                            self.cv = 'ztjkEdit';
+                            self._setupEditor('ztjk_script');
                         } else {
                             LayerHelper.msg('不合法的分享码');
                         }

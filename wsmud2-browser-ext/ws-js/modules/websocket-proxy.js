@@ -231,6 +231,13 @@ if (WebSocket) {
         return cmd_queue.length === 0 && !cmd_busy;
     };
 
+    // 【2026-09-07 软重登】关闭当前真实 WebSocket 连接（游戏侧会自动重连并续连当前角色）
+    unsafeWindow.__extCloseWs = function () {
+        try {
+            if (ws && ws.readyState === 1) ws.close();
+        } catch (e) { }
+    };
+
 } else {
     console.log("插件不可运行，请访问: https://greasyfork.org/zh-CN/forum/discussion/41547/x");
 }

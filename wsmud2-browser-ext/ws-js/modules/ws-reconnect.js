@@ -75,6 +75,74 @@ unsafeWindow.__extRecordKickRole = function () {
     } catch (e) { }
 };
 
+// 【2026-09-07 附加清理】随软重登一并清理游戏各区域的累积 DOM/缓存，减少长期挂机的内存增长：
+//   ① 聊天频道：清 DOM 渲染（MessageQueue.clear）＋ 清按频道缓存数组（Dialog.channel.datas）
+//      —— 只清 DOM 不够：切频道时 footerChanged 会从 datas 重放，消息会"重新出现"
+//   ② 主消息流：同上清 DOM（战斗/物品/系统文本，事件驱动挂机不受影响）
+//   ③ 地图缓存（MAP.Buffer 纯 JS 内存，下次进图自动重新拉取）
+//   注意：.room_items 房间物品列表不清 —— 自动拾取点选依赖它，且游戏每次进房会重建，不会累积
+function _extCleanupSession() {
+    try {
+        // ① 聊天频道：清按频道缓存 + 清当前渲染 DOM
+        if (typeof Dialog !== 'undefined' && Dialog.channel && Array.isArray(Dialog.channel.datas)) {
+            Dialog.channel.datas.length = 0;
+        }
+        // ② 主消息流：优先用游戏自带清理（多分页 pre 一次清干净），失败再手动清文本兜底
+        var msgCleared = false;
+        if (typeof Process !== 'undefined' && Process.channel && typeof Process.channel.clear === 'function') {
+            Process.channel.clear();
+            msgCleared = true;
+        }
+        if (!msgCleared) {
+            var chBox = document.querySelector('.channel');
+            if (chBox) {
+                var chPres = chBox.querySelectorAll('pre');
+                for (var i = 0; i < chPres.length; i++) chPres[i].textContent = '';
+            }
+        }
+        // ③ 主消息流 content-message：同上
+        var cmCleared = false;
+        if (typeof Process !== 'undefined' && Process.message && typeof Process.message.clear === 'function') {
+            Process.message.clear();
+            cmCleared = true;
+        }
+        if (!cmCleared) {
+            var cmBox = document.querySelector('.content-message');
+            if (cmBox) {
+                var cmPres = cmBox.querySelectorAll('pre');
+                for (var j = 0; j < cmPres.length; j++) cmPres[j].textContent = '';
+            }
+        }
+        // ④ 地图缓存：释放 MAP.Buffer 纯 JS 内存，下次进图自动重新拉取
+        if (typeof MAP !== 'undefined' && MAP && MAP.Buffer) {
+            for (var k in MAP.Buffer) {
+                if (MAP.Buffer.hasOwnProperty(k)) delete MAP.Buffer[k];
+            }
+        }
+    } catch (e) { }
+}
+
+// 【2026-09-07 软重登】不刷新页面，1 秒内完成重登：
+//   ① 清空各区域累积 DOM/缓存（左右日志 + 聊天频道 + 主消息流 + 地图缓存）
+//   ② 断开 WebSocket → 游戏侧自动重建连接并续连当前角色（免重新登录）
+//   ③ 启动重连调度兜底（退避重试，失败则按 auto_recover 自动刷新重登）
+//   相比 location.reload()：不再丢失挂机任务状态/计时器/自命令流程
+unsafeWindow.__extManualRelogin = function () {
+    try {
+        // 1) 清理各区域累积 DOM/缓存，减少节点
+        try { if (typeof messageClear === 'function') messageClear(); } catch (e) { }
+        try { if (typeof messageClearRight === 'function') messageClearRight(); } catch (e) { }
+        try { _extCleanupSession(); } catch (e) { }
+        // 2) 断开当前连接，游戏侧收到断线后会自动重建并续连当前角色
+        try { if (typeof unsafeWindow.__extCloseWs === 'function') unsafeWindow.__extCloseWs(); } catch (e) { }
+        // 3) 等 onclose 处理完（约 400ms）再启动重连调度：退避重试 + 失败自动刷新兜底
+        _reloginTry = 0;
+        setTimeout(function () {
+            try { _scheduleRelogin(); } catch (e) { }
+        }, 400);
+    } catch (e) { }
+};
+
 // 跨窗口在线心跳
 var _hbKey = 'ext_live_roles';
 var _hbTimer = null;

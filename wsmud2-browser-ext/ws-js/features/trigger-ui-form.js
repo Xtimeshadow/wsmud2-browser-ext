@@ -8,30 +8,32 @@
 
 TriggerUI._updateTrigger = function (template, trigger) {
     const content = `
-    <div style="margin:0 2em 0 2em">
-        <div style="float:left;width:120px">
-            <span class="zdy-item" style="width:90px" v-for="f in filters">
-            <p style="margin:0"><wht>{{ f.description() }}</wht></p>
-            <input v-if="f.type=='input'" style="width:80%" v-model="conditions[f.name]">
-            <select v-if="f.type=='select'" v-model="conditions[f.name]">
-                <option v-for="opt in f.options" :value="opt">{{ opt }}</option>
-            </select>
+    <div class="wsmd-trigger-form">
+        <div class="wsmd-trigger-filters">
+            <span class="wsmd-filter-card" v-for="f in filters">
+                <span class="wsmd-label" style="display:block;margin-bottom:4px;">{{ f.description() }}</span>
+                <input v-if="f.type=='input'" class="wsmd-input" style="width:100%;" v-model="conditions[f.name]">
+                <select v-if="f.type=='select'" class="wsmd-select" style="width:100%;" v-model="conditions[f.name]">
+                    <option v-for="opt in f.options" :value="opt">{{ opt }}</option>
+                </select>
             </span>
         </div>
-        <div style="float:right;width:calc(100% - 125px)">
-            <textarea id="trigger-source-editor" class = "settingbox hide" spellcheck="false" style = "height:20rem;display:inline-block;font-size:14px;line-height:1.5;width:100%;font-family:'JetBrains Mono',monospace;" v-model="source"></textarea>
-            <span class="raid-item shareTrigger" v-if="canShared" v-on:click="share()">分享此触发器</span>
+        <div class="wsmd-trigger-editor">
+            <textarea id="trigger-source-editor" class="settingbox hide wsmd-code" spellcheck="false" style="height:20rem;display:inline-block;font-size:14px;line-height:1.5;width:100%;font-family:'JetBrains Mono',monospace;" v-model="source"></textarea>
+            <div style="display:flex;justify-content:flex-end;">
+                <span class="wsmd-btn wsmd-btn-gold wsmd-btn-sm" v-if="canShared" v-on:click="share()">分享此触发器</span>
+            </div>
         </div>
     </div>
     `;
-    const title = `<input style='width:110px' type="text" placeholder="输入触发器名称" v-model="name">`;
-    let rightText = "<span v-on:click='save'><wht>保存</wht></span>";
+    const title = `<input class="wsmd-input" style="width:170px;" type="text" placeholder="输入触发器名称" v-model="name">`;
+    let rightText = "<span class='wsmd-btn wsmd-btn-primary wsmd-btn-sm' v-on:click='save'>保存</span>";
     if (trigger) {
-        rightText = "<span v-on:click='remove'>删除</span>"
+        rightText = "<span class='wsmd-btn wsmd-btn-danger wsmd-btn-sm' v-on:click='remove'>删除</span>"
     }
-    let leftText = "<span v-on:click='back'>< 返回</span>";
+    let leftText = "<span class='wsmd-btn wsmd-btn-ghost wsmd-btn-sm' v-on:click='back'>< 返回</span>";
     if (trigger) {
-        leftText = "<span v-on:click='saveback'>< 保存&返回</span>"
+        leftText = "<span class='wsmd-btn wsmd-btn-ghost wsmd-btn-sm' v-on:click='saveback'>< 保存&返回</span>"
     }
     TriggerUI._showModal(title, content, rightText, leftText);
     let conditions = {};
@@ -52,9 +54,13 @@ TriggerUI._updateTrigger = function (template, trigger) {
             name: trigger ? trigger.name : "",
             conditions: conditions,
             source: source,
-            canShared: trigger != null
+            canShared: trigger != null,
+            // 【2026-09-07】变量参考面板：编辑已有触发器时默认展开，避免指导被源码覆盖后看不到变量
+            guideText: template.introdution,
+            showGuide: trigger != null
         },
         methods: {
+            toggleGuide: function () { this.showGuide = !this.showGuide; },
             save: function () {
                 const result = TriggerCenter.create(this.name, template.event, this.conditions, this.source);
                 if (result == true) {
@@ -104,18 +110,8 @@ TriggerUI._updateTrigger = function (template, trigger) {
 };
 
 TriggerUI._appendHtml = function (title, content, rightText, leftText) {
-    var realLeftText = leftText == null ? "" : leftText;
-    var realRightText = rightText == null ? "" : rightText;
-    var html = `
-    <div class = "item-commands" style="text-align:center" id="app">
-        <div style="margin-top:0.5em">
-            <div style="width:6em;float:left;text-align:left;padding:0px 0px 0px 2em;height:1.23em" id="wsmud_raid_left">${realLeftText}</div>
-            <div style="width:calc(100% - 16em);float:left;height:1.23em">${title}</div>
-            <div style="width:6em;float:right;text-align:right;padding:0px 2em 0px 0px;height:1.23em" id="wsmud_raid_right">${realRightText}</div>
-        </div>
-        <br><br>
-        ${content}
-    </div>`;
+    const head = Wsmud.listShell({ title: title, left: leftText, right: rightText });
+    const html = '<div id="app" class="wsmd-list">' + head + content + '</div>';
     WMsg.clean();
     WMsg.append(html, 2);
 };
@@ -123,34 +119,29 @@ TriggerUI._appendHtml = function (title, content, rightText, leftText) {
 TriggerUI._closeModal = function () {
     // 【2026-08-11 加固】关闭弹窗时销毁 Vue 实例（防累积泄漏）
     if (_triggerVue) { _triggerVue.$destroy(); _triggerVue = null; }
+    if (TriggerUI._modalHandle) {
+        TriggerUI._modalHandle.close();
+        TriggerUI._modalHandle = null;
+    }
     var el = document.getElementById('trigger-modal-overlay');
     if (el) el.remove();
 };
 
 TriggerUI._showModal = function (title, content, rightText, leftText) {
     TriggerUI._closeModal();
-    // 移除可能残留的 #app 元素，避免 Vue 挂载到错误的位置
+    // 移除可能残留的 #app 元素，避免 Vue 挂载到错误的位置（日志区列表页复用 #app）
     var staleApp = document.getElementById('app');
     if (staleApp) staleApp.remove();
-    var realLeftText = leftText ?? "";
-    var realRightText = rightText ?? "";
-    var overlay = document.createElement('div');
-    overlay.id = 'trigger-modal-overlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
-    var modal = document.createElement('div');
-    // 【2026-08-26 统一弹窗风格】恢复26.4版本样式
-    modal.style.cssText = 'background:#1a1a2e;border:1px solid #555;border-radius:12px;padding:24px;width:80vw;height:75vh;max-width:95%;max-height:85vh;overflow:auto;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.5);';
-    var html = `
-    <div class="item-commands" style="text-align:center" id="app">
-        <div style="margin-top:0.5em">
-            <div style="width:12em;float:left;text-align:left;padding:0px 0px 0px 2em;height:1.23em" id="wsmud_raid_left">${realLeftText}</div>
-            <div style="width:calc(100% - 16em);float:left;height:1.23em">${title}</div>
-            <div style="width:6em;float:right;text-align:right;padding:0px 2em 0px 0px;height:1.23em" id="wsmud_raid_right">${realRightText}</div>
-        </div>
-        <br><br>
-        ${content}
-    </div>`;
-    modal.insertAdjacentHTML('beforeend', html);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
+    // 【2026-09-07 全面重设计】复用 raid-tools.js 的共享弹窗外壳（wsmd-* 设计系统）
+    // 【2026-09-08 修复】✕ / Esc 关闭弹窗后恢复触发器列表页：开弹窗时上面移除了日志区的 #app 列表页，
+    // 若只 _closeModal 不移除遮罩，退出后左日志区会被错误清空（留白）
+    TriggerUI._modalHandle = Wsmud.modalShell({
+        overlayId: 'trigger-modal-overlay',
+        title: title,
+        content: content,
+        left: leftText,
+        right: rightText,
+        wrapVue: true,
+        onClose: function () { TriggerUI._closeModal(); TriggerUI.triggerHome(); }
+    });
 };

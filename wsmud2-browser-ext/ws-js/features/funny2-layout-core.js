@@ -47,14 +47,16 @@ window.__funny2_layout = window.__funny2_layout || {};
         })();
 
         function confirmWight() {
+            // 【2026-09-06 修复】游戏本体把 dialog-confirm append 到 body（包含块为 body），
+            // 三栏布局下用「视口宽-左右栏宽」估算 left/width 既不准确也易受 margin 干扰。
+            // 改为把 dialog-confirm 移到 .container 内：container 是 position:relative，
+            // 游戏原版 CSS（position:absolute; left:0; bottom:0; width:100%）即自动贴合 container。
             var d = document.querySelector('.dialog-confirm');
-            var l = document.querySelector('.left') || { offsetWidth: 0 };
-            var r = document.querySelector('.right') || { offsetWidth: 0 };
-            if (!d) return;
-            var total = l.offsetWidth + r.offsetWidth;
-            d.style.width = (window.innerWidth - total) + 'px';
-            d.style.left = l.offsetWidth + 'px';
-            d.style.right = r.offsetWidth + 'px';
+            var c = document.querySelector('.container');
+            if (!d || !c) return;
+            if (!c.contains(d)) {
+                c.appendChild(d);
+            }
         }
 
         (function moveAndStyleToolbar() {
@@ -85,6 +87,18 @@ window.__funny2_layout = window.__funny2_layout || {};
 
         confirmWight();
         window.addEventListener('resize', function () { confirmWight(); });
+        // 【2026-09-06 兜底】dialog-confirm 是游戏登录时 Confirm.Init() 才创建，扩展注入时可能尚不存在；
+        // 监视 body 变化，一旦出现即移入 .container
+        if (!confirmWight()) {
+            var _cfObserver = new MutationObserver(function () {
+                if (confirmWight() && _cfObserver) {
+                    _cfObserver.disconnect();
+                    _cfObserver = null;
+                }
+            });
+            _cfObserver.observe(document.body, { childList: true, subtree: true });
+            window.__cfObserver__ = _cfObserver;
+        }
     };
 
     // ========== 右侧栏（RIGHT） ==========
@@ -92,18 +106,18 @@ window.__funny2_layout = window.__funny2_layout || {};
         /********************RIGHT********************/
         GM_addStyle([
             '.right{ order: 1; display: flex; flex-direction: column; flex-wrap: nowrap; }',
-            '.right-channel { width: 100%; flex: 0 0 50%; margin: 8px; overflow: auto; display: flex; flex-direction: column; position: relative; min-height: 0; }',
+            '.right-channel { width: 100%; flex: 0 0 50%; margin: 8px; overflow: auto; display: flex; flex-direction: column; position: relative; min-height: 0; background: var(--ws-card); }',
             '.channel { max-height: 90% !important; flex: 1; overflow: auto;}',
             '.right .channel > pre { font-family: inherit !important; font-size: inherit !important; }',
-            '.right-channel-tabs { flex-shrink: 0; display: flex; gap: 2px; padding: 4px 6px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.15); }',
-            '.right-channel-tabs > span { cursor: pointer; padding: 2px 8px; border-radius: 3px; color: #aaa; }',
-            '.right-channel-tabs > span:hover { background: rgba(255,255,255,0.1); color: #fff; }',
-            '.right-channel-tabs > span.selected { background: rgba(190,190,190,0.3); color: #fff; }',
+            '.right-channel-tabs { flex-shrink: 0; display: flex; gap: 2px; padding: 4px 6px; background: var(--ws-card); border-top: 1px solid var(--ws-border); }',
+            '.right-channel-tabs > span { cursor: pointer; padding: 2px 8px; border-radius: 3px; color: var(--ws-text-dim); }',
+            '.right-channel-tabs > span:hover { background: var(--ws-card-hover); color: var(--ws-text); }',
+            '.right-channel-tabs > span.selected { background: rgba(65,217,183,.18); color: var(--ws-cyan); }',
             '.WG_right_log { width: 100%; flex: 1; margin: 8px; overflow: auto; min-height: 0; max-height: none !important; display: flex; flex-direction: column; }',
-            '.WG_right_log_title { color: #ffffff; font-weight: bold; padding: 4px 10px; border-bottom: 1px solid rgba(255,255,255,0.25); flex-shrink: 0; }',
+            '.WG_right_log_title { color: var(--ws-cyan); font-weight: bold; padding: 4px 10px; border-bottom: 1px solid var(--ws-border); flex-shrink: 0; }',
             '.WG_right_log > pre { flex: 1; overflow-y: auto; }',
-            '.right-divider { height: 5px; cursor: row-resize; background: rgba(128,128,128,0.3); flex-shrink: 0; position: relative; z-index: 1; display: none; }',
-            '.right-divider:hover, .right-divider.active { background: rgba(128,128,128,0.6); }',
+            '.right-divider { height: 5px; cursor: row-resize; background: var(--ws-border); flex-shrink: 0; position: relative; z-index: 1; display: none; }',
+            '.right-divider:hover, .right-divider.active { background: var(--ws-cyan); }',
         ].join('\n'));
 
         $(".right").append(
@@ -154,13 +168,19 @@ window.__funny2_layout = window.__funny2_layout || {};
             _channelTabBar.append(tab);
         });
 
-        // 持续监控：确保 .channel 在 .right-channel 内
+        // 持续监控：确保 .channel 在 .right-channel 内，且排在频道标签栏之前
+        // 双击 .channel 时游戏会把它移进弹窗，若用 appendTo 放回末尾会把标签栏挤到上方
         setInterval(function () {
             var $channel = $('.channel');
             var $rightChannel = $('.right-channel');
             if ($channel.length > 0 && $rightChannel.length > 0) {
-                if (!$channel.parent().hasClass('right-channel')) {
-                    $channel.appendTo($rightChannel);
+                if (!$rightChannel.is($channel.parent())) {
+                    $rightChannel.prepend($channel);
+                } else {
+                    var $tabs = $rightChannel.children('.right-channel-tabs');
+                    if ($tabs.length && $tabs.index() < $channel.index()) {
+                        $rightChannel.prepend($channel);
+                    }
                 }
                 $channel.off('click');
                 if (typeof GameState !== 'undefined' && GameState.id) {
@@ -184,7 +204,13 @@ window.__funny2_layout = window.__funny2_layout || {};
             '.left { height: calc(100vh - 20px); order: -1; display: flex; flex-direction: column; flex-wrap: nowrap; }',
             '.left-content { width: 100%; height: auto; flex: 0 0 auto;}',
             '.left-hotkeys { width: 100%; flex: 1; padding-left: 5px; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }',
-            '.WG_left_log { width: 100%; flex: 1; overflow-y: auto; max-height: none !important; min-height: 0; }',
+            /* 【2026-09-08 修复】主题1(master)下 WG_left_log 也正确撑满左栏：flex 列布局 + pre 撑满并滚动
+               与右侧 WG_right_log 同模式；与 主题2(fork) 对齐，切换主题时内部排版一致 */
+            '.WG_left_log { display: flex !important; flex-direction: column; width: 100%; flex: 1 1 auto; max-height: none !important; min-height: 0; overflow: hidden; box-sizing: border-box; }',
+            '.left-hotkeys > .WG_left_log { width: 100% !important; flex: 1 1 auto !important; min-height: 0 !important; box-sizing: border-box !important; }',
+            '.WG_left_log, .WG_left_log * { box-sizing: border-box !important; }',
+            '.WG_left_log > pre { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0; }',
+            '.WG_left_log .item-commands { padding-bottom: 0 !important; margin: 0 !important; }',
             '.map-panel { display: flex; justify-content: center; overflow-x: auto; }',
             '.map-panel svg.map { flex-shrink: 0; }',
         ].join('\n'));
@@ -201,12 +227,12 @@ window.__funny2_layout = window.__funny2_layout || {};
         GM_addStyle([
             '.left-content { margin: 10px 0; overflow: auto; }',
             '.left-content { display: flex; flex-direction: column; flex-wrap: nowrap; }',
-            '.content-title { flex: 0 0 auto; border: gray solid 1px; border-radius: 3px; display: flex; }',
-            '.content-info { flex: 0 1 auto; border: gray solid 1px; border-radius: 3px; margin-top: 5px; overflow: auto; }',
+            '.content-title { flex: 0 0 auto; border: var(--ws-border) solid 1px; border-radius: 8px; display: flex; background: var(--ws-card); }',
+            '.content-info { flex: 0 1 auto; border: var(--ws-border) solid 1px; border-radius: 8px; margin-top: 5px; overflow: auto; background: var(--ws-card); }',
             '.info-row { display: flex; }',
             '.info-item { flex: 0 1 999px; dispaly: inline-block; text-align: center; }',
             '.info-title { flex: 0 0 65px; dispaly: inline-block; text-align: center; }',
-            '.item-row { display: flex; border-bottom: gray dotted 0.5px; }',
+            '.item-row { display: flex; border-bottom: var(--ws-line) dotted 0.5px; }',
             '.item-name { cursor: pointer; }',
             '.item-count { dispaly: inline-block; text-align: right; flex: 1 0 auto; }',
         ].join('\n'));

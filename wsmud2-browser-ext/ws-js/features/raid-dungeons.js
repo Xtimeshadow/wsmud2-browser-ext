@@ -127,6 +127,7 @@
 #select ($_DungeonWaitSkillCD) = Boss战前等待技能冷却,打开|关闭,(_DungeonWaitSkillCD)
 #select ($_DungeonBagCleanWay) = 背包清理方案,不清理|售卖|存仓及售卖,(_DungeonBagCleanWay)
 #select ($_DungeonRecordGains) = 结束后显示收益统计,是|否,(_DungeonRecordGains)
+#config
 `;
         return result + source;
     }

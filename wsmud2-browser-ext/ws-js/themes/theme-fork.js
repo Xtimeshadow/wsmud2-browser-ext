@@ -287,38 +287,7 @@
     `);
 
     // ===== 右侧频道标签 Fork 风格 =====
-    addThemeStyle(`
-      .right-channel-tabs {
-        background: transparent !important;
-        border-top: 1px solid rgba(0,128,0,.16) !important;
-        padding: 4px 2px 2px !important;
-        gap: 3px !important;
-      }
-      .right-channel-tabs > span {
-        flex: 1 1 0 !important;
-        min-width: 0 !important;
-        text-align: center !important;
-        color: #999999 !important;
-        border: 1px solid #666666 !important;
-        border-radius: 3px !important;
-        padding: 2px 0 !important;
-        cursor: pointer !important;
-        user-select: none !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        background: #000000 !important;
-      }
-      .right-channel-tabs > span:hover {
-        color: #00ff00 !important;
-        border-color: rgba(0,255,0,.6) !important;
-      }
-      .right-channel-tabs > span.selected {
-        color: #FFD700 !important;
-        border-color: #FFD700 !important;
-        background: rgba(255,215,0,.1) !important;
-      }
-    `);
+    // 【2026-09-08 移除】多频道切换改与 主题1(master) 一致，删除 fork 专属标签样式，走 wg-core 公共 channel-tabs 规则
 
     // ===== 可拖拽分隔条 Fork 风格 =====
     addThemeStyle(`
@@ -348,8 +317,8 @@
     addThemeStyle(`
       /* WG_right_log 字体继承游戏 */
       .WG_right_log > pre { font-family: inherit !important; font-size: inherit !important; }
-      /* 日志区 WG_right_log 内部 pre 也继承游戏字体 */
-      .right > .WG_right_log pre { font-family: inherit !important; font-size: inherit !important; color: #c0c0c0 !important; line-height: 1.65 !important; }
+      /* 日志区 WG_right_log 内部 pre 也继承游戏字体（不设 line-height，与主题1的默认紧凑行距保持一致） */
+      .right > .WG_right_log pre { font-family: inherit !important; font-size: inherit !important; color: #c0c0c0 !important; }
       .content-message pre { font-family: inherit !important; font-size: inherit !important; line-height: 1.65 !important; }
     `);
 

@@ -192,6 +192,10 @@ const TaskHelper = {
             duration: 2
         });
         WG.SendCmd(cmds);
+    },
+    // 软重登当前角色（不刷新页面：清日志 DOM + 断线自动续连，约1秒；挂机状态不丢）
+    relogin: function (idx, n, cmds) {
+        if (typeof unsafeWindow.__extManualRelogin === 'function') unsafeWindow.__extManualRelogin();
     }
 };
 const T = TaskHelper;
