@@ -56,6 +56,20 @@ window.__funny2_layout = window.__funny2_layout || {};
             if (!d || !c) return;
             if (!c.contains(d)) {
                 c.appendChild(d);
+                d.dataset.wsmudMoved = '1';
+            }
+            // 【2026-09-09 修复】被移入 .container 后，点击 confirm-count 的输入框等弹窗内部元素时，
+            // click/mousedown 会一路冒泡到 container/body，触发新客户端在父级挂的“点击关闭”逻辑，
+            // 导致弹窗一点输入就消失。这里只在 dialog-confirm 自身做冒泡闸门：
+            // 拦截内部点击向父级冒泡，但不阻止输入框聚焦，也不影响确认按钮/数量加减（它们事件先于此处触发）。
+            if (!d.dataset.wsmudGuard) {
+                d.dataset.wsmudGuard = '1';
+                function stopConfirmBubble(e) {
+                    e.stopPropagation();
+                }
+                d.addEventListener('click', stopConfirmBubble, false);
+                d.addEventListener('mousedown', stopConfirmBubble, false);
+                d.addEventListener('touchstart', stopConfirmBubble, false);
             }
         }
 

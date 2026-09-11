@@ -22,12 +22,15 @@
     const target = new SelectFilter("触发对象", ["自己", "他人"], 0);
     let filters = [type, value, target];
     const intro = `// Buff状态改变触发器
-// 触发对象id：(id)
-// buff的sid：(sid)
-// buff层数：(count)
-// duration持续时间：(duration);
-// buff的名字：(name)
-// ⚠ 填写提示：多个 BuffId 用单个 | 分隔，如 weapon|sword`;
+// 触发方式：身上 Buff 新增、移除或层数刷新时触发
+// ⚠ 条件填写：多个 BuffId 用单个 | 分隔，如 weapon|sword
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)       触发对象ID
+//   (sid)      Buff的ID
+//   (count)    Buff当前层数
+//   (duration) Buff持续时间（秒）
+//   (name)     Buff名字`;
     const t = new TriggerTemplate("Buff状态改变", filters, intro);
     TriggerTemplateCenter.add(t);
 

@@ -26,12 +26,15 @@ var RoomItems = {};
     });
     let filters = [name, type, compare, valueType, value];
     const intro = `// 气血内力改变触发器
-// 人物id：(id)
-// 人物当前气血：(hp)
-// 人物最大气血：(maxHp)
-// 人物当前内力：(mp)
-// 人物最大内力：(maxMp)
-// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
+// 触发方式：场景内人物气血或内力变化时触发
+// ⚠ 条件填写：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        人物ID
+//   (hp)        当前气血
+//   (maxHp)     最大气血
+//   (mp)        当前内力
+//   (maxMp)     最大内力`;
     const t = new TriggerTemplate("气血内力改变", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -141,12 +144,14 @@ var RoomItems = {};
     });
     let filters = [name, valueType, value];
     const intro = `// 伤害已满触发器
-// 备注：限制条件-值 不支持多条件
-// 人物id：(id)
-// 人物名称：(name)
-// 伤害数值：(value)
-// 伤害百分比：(percent)
-// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
+// 触发方式：目标受到伤害并累计跨过设定阈值时触发
+// ⚠ 条件填写：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰；限制条件-值 不支持多条件；「值」为跨阈值判断，填 旧值;新值
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        人物ID
+//   (name)      人物名称
+//   (value)     伤害数值
+//   (percent)   伤害百分比`;
     const t = new TriggerTemplate("伤害已满", filters, intro);
     TriggerTemplateCenter.add(t);
 

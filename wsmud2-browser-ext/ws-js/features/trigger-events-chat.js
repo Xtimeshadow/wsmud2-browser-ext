@@ -24,11 +24,14 @@
     const key = new InputFilter("关键字", InputFilterFormat.text, "", KeyAssert);
     let filters = [channel, talker, pass_talker, key];
     const intro = `// 新聊天信息触发器
-// 聊天信息内容：(content)
-// 发言人：(name)
-// 发言人id：(id)
-// 频道：(channel)
-// ⚠ 填写提示：发言人/忽略发言人 多个用单个 | 分隔；关键字 用 || 或、&& 且、() 括号组合`;
+// 触发方式：收到世界/队伍/门派/全区/帮派/谣言/系统频道消息时触发
+// ⚠ 条件填写：发言人/忽略发言人 多个用单个 | 分隔；关键字 用 || 或、&& 且、() 括号组合
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (content)  聊天内容
+//   (name)     发言人
+//   (id)       发言人ID
+//   (channel)  频道（世界/队伍/门派/全区/帮派/谣言/系统）`;
     const t = new TriggerTemplate("新聊天信息", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -76,9 +79,12 @@
     name.description("人名关键字");
     let filters = [name];
     const intro = `// 人物刷新触发器
-// 刷新人物id：(id)
-// 刷新人物名称：(name)
-// ⚠ 填写提示：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰`;
+// 触发方式：场景中出现新人物（NPC、玩家等）时触发
+// ⚠ 条件填写：人名关键字 用 || 或、&& 且、() 括号组合，如 张无忌 || 张三丰
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        人物ID
+//   (name)      人物名称`;
     const t = new TriggerTemplate("人物刷新", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -106,11 +112,14 @@
     const name = new InputFilter("名称关键字", InputFilterFormat.text, "", KeyAssert);
     let filters = [name];
     const intro = `// 物品拾取触发器
-// 拾取物品id：(id)
-// 拾取物品名称：(name)
-// 拾取物品数量：(count)
-// 物品品质：(quality)  值：白、绿、蓝、黄、紫、橙、红、未知
-// ⚠ 填写提示：名称关键字 用 || 或、&& 且、() 括号组合，如 玄铁剑 || 倚天剑`;
+// 触发方式：拾取物品时触发
+// ⚠ 条件填写：名称关键字 用 || 或、&& 且、() 括号组合，如 玄铁剑 || 倚天剑
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        物品ID
+//   (name)      物品名称
+//   (count)     物品数量
+//   (quality)   品质：白、绿、蓝、黄、紫、橙、红、未知`;
     const t = new TriggerTemplate("物品拾取", filters, intro);
     TriggerTemplateCenter.add(t);
 

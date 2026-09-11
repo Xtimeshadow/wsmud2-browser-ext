@@ -502,8 +502,16 @@ let _raidModalHandle = null;
 
 const RaidUI = {
     showToolbar: function () {
-        if (!RaidUI._toolbarHidden) return;
-        RaidUI._toolbarHidden = false;
+        // 【2026-09-11 修复偶发不加载】幂等 + 等待 WG_left_log 就绪。
+        // 原逻辑用一次性标志 _toolbarHidden：若 login 钩子触发时左侧日志容器
+        // （$(".WG_left_log")）尚未渲染，.before() 静默失败，但标志已被置 false，
+        // 后续登录不再重试 → 工具栏永久缺失。现改为：
+        //   1) 以 #raidToolbar 是否存在做幂等判断；
+        //   2) 容器未就绪时用 MutationObserver 等它出现后补插，避免一次性失败。
+        if (document.getElementById('raidToolbar')) {
+            RaidUI._toolbarHidden = false;
+            return;
+        }
         var raidToolbar = `
         <style>
             .raid-item{
@@ -535,20 +543,48 @@ const RaidUI = {
                 <span class="raid-item zmlztjk"><hir>自命令</hir></span>
             </div>
         </div>`
-        $(".WG_left_log").before(raidToolbar);
-        $(".customFlow").on('click', RaidUI.workflows);
-        $(".trigger").on('click', RaidUI.trigger);
-        $(".forum").on('click', RaidUI.forum);
-        $(".shortcut").on('click', RaidUI.shortcut);
-        $(".moreRaid").on('click', RaidUI.dungeons);
-        $(".commandLine").on('click', RaidUI.commandLine);
-        $(".itemLog").on('click', RaidUI.itemLog);
-        // 【2026-08-08 新增】"自命令"按钮：点击打开/关闭 自命令+自定义监控 面板（同右键菜单"自命令、自定义监控"）
-        $(".zmlztjk").on('click', function () {
-            if (unsafeWindow && unsafeWindow.WG && WG.zmlztjk) {
-                WG.zmlztjk();
-            }
-        });
+        var bindEvents = function () {
+            $(".customFlow").on('click', RaidUI.workflows);
+            $(".trigger").on('click', RaidUI.trigger);
+            $(".forum").on('click', RaidUI.forum);
+            $(".shortcut").on('click', RaidUI.shortcut);
+            $(".moreRaid").on('click', RaidUI.dungeons);
+            $(".commandLine").on('click', RaidUI.commandLine);
+            $(".itemLog").on('click', RaidUI.itemLog);
+            // 【2026-08-08 新增】"自命令"按钮：点击打开/关闭 自命令+自定义监控 面板（同右键菜单"自命令、自定义监控"）
+            $(".zmlztjk").on('click', function () {
+                if (unsafeWindow && unsafeWindow.WG && WG.zmlztjk) {
+                    WG.zmlztjk();
+                }
+            });
+        };
+        // 插入并校验：容器未渲染时返回 false，由下方观察器补插
+        var tryMount = function () {
+            var $log = $(".WG_left_log");
+            if ($log.length === 0) return false;
+            if (document.getElementById('raidToolbar')) return true;
+            $log.before(raidToolbar);
+            if (!document.getElementById('raidToolbar')) return false;
+            bindEvents();
+            RaidUI._toolbarHidden = false;
+            return true;
+        };
+        if (tryMount()) return;
+        // 容器未就绪（新客户端登录后左侧栏异步渲染）：观察 DOM，出现后补插；
+        // 30s 兜底超时，避免观察器/定时器无限堆积
+        var done = false;
+        var finish = function () {
+            if (done) return;
+            done = true;
+            if (RaidUI._toolbarObserver) { RaidUI._toolbarObserver.disconnect(); RaidUI._toolbarObserver = null; }
+            if (RaidUI._toolbarWaitTimer) { clearTimeout(RaidUI._toolbarWaitTimer); RaidUI._toolbarWaitTimer = null; }
+        };
+        if (document.body) {
+            if (RaidUI._toolbarObserver) RaidUI._toolbarObserver.disconnect();
+            RaidUI._toolbarObserver = new MutationObserver(function () { if (tryMount()) finish(); });
+            RaidUI._toolbarObserver.observe(document.body, { childList: true, subtree: true });
+            RaidUI._toolbarWaitTimer = setTimeout(function () { finish(); }, 30000);
+        }
     },
     trigger: function () {
         if (unsafeWindow.TriggerUI == null) {

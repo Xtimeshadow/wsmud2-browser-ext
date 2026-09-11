@@ -13,7 +13,9 @@
 (function () {
     const type = new SelectFilter("类型", ["进入战斗", "脱离战斗"], 0);
     let filters = [type];
-    const intro = "// 战斗状态切换触发器";
+    const intro = `// 战斗状态切换触发器
+// 触发方式：进入或脱离战斗时触发
+// ⚠ 本触发无变量，仅按「类型」条件判断`;
     const t = new TriggerTemplate("战斗状态切换", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -49,7 +51,9 @@
 (function () {
     const type = new SelectFilter("类型", ["已经死亡", "已经复活"], 0);
     let filters = [type];
-    const intro = "// 死亡状态改变触发器";
+    const intro = `// 死亡状态改变触发器
+// 触发方式：死亡或复活时触发
+// ⚠ 本触发无变量，仅按「类型」条件判断`;
     const t = new TriggerTemplate("死亡状态改变", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -87,7 +91,13 @@
     second.description("秒");
     let filters = [hour, minute, second];
     const intro = `// 时辰已到触发器
-// ⚠ 填写提示：时/分/秒 留空或填 * = 任意；填 1|2|3 = 多个可选；填 5 = 仅 5；例（每个整点）：时留空、分=0、秒=0`;
+// 触发方式：每秒触发一次，可用时/分/秒条件限定
+// ⚠ 条件填写：时/分/秒 留空或填 * = 任意；填 1|2|3 = 多个可选；填 5 = 仅 5；例（每个整点）：时留空、分=0、秒=0
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (hour)     时
+//   (minute)   分
+//   (second)   秒`;
     const t = new TriggerTemplate("时辰已到", filters, intro);
     TriggerTemplateCenter.add(t);
 
@@ -150,18 +160,24 @@
     const sid = new InputFilter("技能id", InputFilterFormat.text, "", ContainAssert);
     let filters = [sid];
     const intro = `// 技能释放触发器
-// 技能id：(id)
-// 出招时间：(rtime)
-// 冷却时间：(distime)
-// ⚠ 填写提示：技能id 多个用单个 | 分隔，如 100|200`;
+// 触发方式：释放技能时触发
+// ⚠ 条件填写：技能id 多个用单个 | 分隔，如 100|200
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        技能ID
+//   (rtime)     出招时间
+//   (distime)   冷却时间`;
     const t = new TriggerTemplate("技能释放", filters, intro);
     TriggerTemplateCenter.add(t);
 
     const sid1 = new InputFilter("技能id", InputFilterFormat.text, "", ContainAssert);
     let filters1 = [sid1];
     const intro1 = `// 技能冷却结束触发器
-// 技能id：(id)
-// ⚠ 填写提示：技能id 多个用单个 | 分隔，如 100|200`;
+// 触发方式：技能冷却结束时触发（释放技能后自动计时）
+// ⚠ 条件填写：技能id 多个用单个 | 分隔，如 100|200
+//
+// 变量说明（触发时自动注入源码开头，源码中直接用 (变量名) 引用）：
+//   (id)        技能ID`;
     const t1 = new TriggerTemplate("技能冷却结束", filters1, intro1);
     TriggerTemplateCenter.add(t1);
 

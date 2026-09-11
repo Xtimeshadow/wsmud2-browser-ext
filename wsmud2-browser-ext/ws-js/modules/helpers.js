@@ -8,6 +8,7 @@
 //   T.wait / T.batwait           等待（含"等待某个条件"）
 //   T.killall / T.getall / T.to  全杀/全捡/前往
 //   T.roll / T.cls / T.syso      掷骰子/清屏/输出
+//   T.eq / T.eqskill / T.eqcover  换装备套装/换技能套装/覆盖套装（$eq / $eqskill / $eqcover）
 //   T.stop / T.close / T.tts / T.beep / T.music  杂项
 // ============================================================
 'use strict';
@@ -192,6 +193,22 @@ const TaskHelper = {
             duration: 2
         });
         WG.SendCmd(cmds);
+    },
+    // 换装备套装：$eq 套装名
+    eq: function (idx = 0, n, cmds) {
+        WG.eqhelper(n, 0);
+        WG.SendCmd(TaskHelper.recmd(idx, cmds));
+    },
+    // 换技能套装：$eqskill 套装名
+    eqskill: function (idx = 0, n, cmds) {
+        WG.eqhelper(n, 1);
+        WG.SendCmd(TaskHelper.recmd(idx, cmds));
+    },
+    // 覆盖套装：$eqcover 套装名（删旧套 + 以当前装备重新保存）
+    eqcover: function (idx = 0, n, cmds) {
+        WG.eqhelperdel(n);
+        WG.eqhelper(n);
+        WG.SendCmd(TaskHelper.recmd(idx, cmds));
     },
     // 软重登当前角色（不刷新页面：清日志 DOM + 断线自动续连，约1秒；挂机状态不丢）
     relogin: function (idx, n, cmds) {

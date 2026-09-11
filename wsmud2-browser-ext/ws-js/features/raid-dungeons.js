@@ -114,6 +114,12 @@
         if (source == null) {
             return null;
         }
+        // 让整段副本流程支持按"运行次数"循环：给每行统一加 4 空格缩进，嵌入外层 [while]
+        const sourceLines = source.split('\n');
+        const indentedSource = sourceLines.map(function (line) {
+            return line.trim() === '' ? '' : '    ' + line;
+        }).join('\n');
+
         const result = `
 [if] (_DungeonHpThreshold) == null
     ($_DungeonHpThreshold) = 50
@@ -123,11 +129,18 @@
     ($_DungeonBagCleanWay) = 存仓及售卖
 [if] (_DungeonRecordGains) == null
     ($_DungeonRecordGains) = 是
+[if] (_DungeonRunTimes) == null
+    ($_DungeonRunTimes) = 1
 #select ($_DungeonHpThreshold) = 副本内疗伤，当气血低于百分比,100|90|80|70|60|50|40|30|20|10,(_DungeonHpThreshold)
 #select ($_DungeonWaitSkillCD) = Boss战前等待技能冷却,打开|关闭,(_DungeonWaitSkillCD)
 #select ($_DungeonBagCleanWay) = 背包清理方案,不清理|售卖|存仓及售卖,(_DungeonBagCleanWay)
 #select ($_DungeonRecordGains) = 结束后显示收益统计,是|否,(_DungeonRecordGains)
+#input ($_DungeonRunTimes) = 副本运行次数,(_DungeonRunTimes)
 #config
+($dgn_i) = 0
+[while] (dgn_i) < (_DungeonRunTimes)
+${indentedSource}
+($dgn_i) = (dgn_i) + 1
 `;
-        return result + source;
+        return result;
     }
