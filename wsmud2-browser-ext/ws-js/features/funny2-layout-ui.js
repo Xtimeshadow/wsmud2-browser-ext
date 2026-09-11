@@ -191,6 +191,7 @@ window.__funny2_layout = window.__funny2_layout || {};
                     var fn = (typeof unsafeWindow !== 'undefined' && unsafeWindow.__extManualRelogin) || window.__extManualRelogin;
                     if (fn) fn();
                 })
+                $('<hio class="span-btn"></hio>').append("帮会").click(toSchoolBP)
             ),
             $("<div></div>")
         );

@@ -180,6 +180,8 @@ var UI = {
       <textarea id="zml_info" v-model="editForm.zmlRun" class="wsmd-textarea wsmd-code" style="flex:1;width:100%;resize:vertical;"></textarea>
     </div>
     <div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--ws-border);">
+    <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-edit" @click="getShareZml">查询分享</span>
       <span class="zml-btn zml-btn-action" @click="shareZml(editForm)">分享</span>
       <span class="zml-btn zml-btn-run" @click="saveZml">保存</span>
       <span class="zml-btn" style="border-color:var(--ws-danger);color:var(--ws-danger);" @click="deleteZml">删除</span>
@@ -226,6 +228,8 @@ var UI = {
       <textarea id="ztjk_script" v-model="editZtjkForm.script" class="wsmd-textarea wsmd-code" style="flex:1;width:100%;resize:vertical;"></textarea>
     </div>
     <div style="display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--ws-border);">
+    <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
+      <span class="zml-btn zml-btn-edit" @click="getShareZtjk">查询分享</span>
       <span class="zml-btn zml-btn-action" @click="shareZtjk(editZtjkForm)">分享</span>
       <span class="zml-btn zml-btn-run" @click="saveZtjk">保存</span>
       <span class="zml-btn" style="border-color:var(--ws-danger);color:var(--ws-danger);" @click="deleteZtjk">删除</span>

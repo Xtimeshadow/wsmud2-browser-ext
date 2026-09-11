@@ -273,69 +273,8 @@
                 return p.priority >= c.priority;
             });
         },
-        //【2026-08-09 移植v1.0.0 + 强化】execute 改 async：预扫描 (:eqHas) 词条用法。
-        // 每次使用都强制重新 checkobj 查看装备（词条可被替换/洗练，不能用缓存），等待回包（最大 3 秒）
+        //【2026-09-06 调整】execute 改 async：已删除 (:eqHas) 词条的预扫描与自动 checkobj 拉取
         execute: async function (performer, cmd) {
-            var eqHasPattern = /\(:eqHas\s+([^,]+?),\s*[^)]+\)/g;
-            var match;
-            var fetchIds = [];
-            var allParam = {};
-            Object.assign(allParam, VariableStore.getAll(), performer.tempParams || {});
-            while ((match = eqHasPattern.exec(cmd)) !== null) {
-                var hasId = (match || ["", "", "", ""])[1].trim();
-                if (hasId.indexOf("(") == 0 && hasId.lastIndexOf(")") == hasId.length - 1) {
-                    var hasVar = hasId.substring(1, hasId.length - 1);
-                    hasId = allParam[hasVar] || "";
-                }
-                if (hasId && fetchIds.indexOf(hasId) < 0) {
-                    fetchIds.push(hasId);
-                }
-            }
-            if (fetchIds.length > 0) {
-                for (var fi = 0; fi < fetchIds.length; fi++) {
-                    var eqId = fetchIds[fi];
-                    // 【2026-08-09 优化】智能定位：本地数据能确定位置就只发一条，避免无脑发两条
-                    var locate = null; // 'eq' | 'item' | null(未知)
-                    if (Role.equipments && Role.equipments.eqs) {
-                        for (var ei = 0; ei < Role.equipments.eqs.length; ei++) {
-                            if (Role.equipments.eqs[ei] && Role.equipments.eqs[ei].id == eqId) {
-                                locate = "eq";
-                                break;
-                            }
-                        }
-                    }
-                    if (locate == null && Role.items && Role.items[eqId] != null) {
-                        locate = "item";
-                    }
-                    var tries = locate == null ? ["eq", "item"] : [locate];
-                    for (var ti = 0; ti < tries.length; ti++) {
-                        Role._pendingEqFetch = eqId;
-                        WG.SendCmd("checkobj " + eqId + " from " + tries[ti]);
-                        console.log("[Raid] (:eqHas) 自动查看装备: checkobj " + eqId + " from " + tries[ti]);
-                        // 非最后位置只等 1 秒就切换下一个位置；最后位置等 3 秒
-                        var waitMax = (ti < tries.length - 1) ? 10 : 30;
-                        await new Promise(function (resolve) {
-                            var waitCount = 0;
-                            var timer = setInterval(function () {
-                                waitCount++;
-                                if (Role._pendingEqFetch === "done") {
-                                    clearInterval(timer);
-                                    Role._pendingEqFetch = null;
-                                    resolve();
-                                } else if (waitCount > waitMax) {
-                                    clearInterval(timer);
-                                    Role._pendingEqFetch = null;
-                                    resolve();
-                                }
-                            }, 100);
-                        });
-                        if (Role.itemDescs[eqId] != null) break; // 已拉到描述，不再试下一个位置
-                    }
-                    if (Role.itemDescs[eqId] == null) {
-                        console.warn("[Raid] 自动查看装备超时/无返回，词条数据未就绪: checkobj " + eqId);
-                    }
-                }
-            }
             var valid = null;
             for (const executor of this._executors) {
                 if (executor.appropriate(cmd)) {

@@ -30,7 +30,10 @@
                         _ensureDialogReady(dlg, name, D);
                     }
                 } catch (e) { }
-                return origShow.apply(this, arguments);
+                var _ret = origShow.apply(this, arguments);
+                // 【自愈】江湖面板打开后延迟检查内容，为空则补发 jh（游戏自身经常不自动拉数据）
+                if (name === 'jh') _jhCheckHeal(1500);
+                return _ret;
             };
             D._extPatched = true;
         }
@@ -40,6 +43,7 @@
             var origDialog = P.dialog;
             P.dialog = function (data) {
                 var name = data && data.dialog;
+                var _isJh = name === 'jh';
                 try {
                     // 诊断标记：记录最后一次 dialog 消息类型（便于排查 onData 崩溃）
                     try { document.body.setAttribute('data-ext-last-dialog', String(name)); } catch (e) { }
@@ -48,7 +52,21 @@
                         _ensureDialogReady(dlg, name, D);
                     }
                 } catch (e) { }
-                return origDialog.apply(this, arguments);
+                try {
+                    var _ret = origDialog.apply(this, arguments);
+                    if (_isJh) {
+                        // 收到江湖主数据(fbs) → 数据管道正常，重置自愈重试计数
+                        if (data && data.fbs) _jhHealState.count = 0;
+                        // 收到江湖消息后延迟检查渲染结果，为空则补发 jh
+                        _jhCheckHeal(800);
+                    }
+                    return _ret;
+                } catch (e) {
+                    // 【自愈】渲染崩溃（新客户端 onData 的 null 解引用会在分发时抛出）
+                    // 补发 jh 让服务端重发数据，同时保留游戏原有的报错打印行为
+                    if (_isJh) { try { _jhTryHeal(); } catch (e2) { } }
+                    throw e;
+                }
             };
             P._extDialogPatched = true;
         }
@@ -78,6 +96,58 @@
         try {
             if (dlg.isShow && typeof D.close === 'function') D.close();
         } catch (e3) { }
+    }
+
+    // ---- 【自愈】江湖面板空内容/渲染崩溃自愈 ----
+    // 背景：新客户端 ws.js 的 Dialog.jh.onData 对某些 jh 消息存在无保护的 null 解引用
+    // （编译前逻辑形如 he[data.t][items][data.index]，he/t/items 为 null 时崩溃），
+    // 游戏日志报 "解析数据时发生了一个错误 ... Cannot read properties of null (reading '1')"。
+    // 崩溃后数据没进缓存 → 之后每次打开江湖都是空内容（黑屏），且游戏不会自动重新拉数据。
+    // 本自愈：面板打开 / 收到 jh 消息 / 渲染崩溃时，检测内容为空则自动补发 'jh' 指令，
+    // 让服务端重新下发面板数据；带 6 秒防抖 + 每轮最多 3 次重试，避免刷屏。
+    var _jhHealState = { lastTry: 0, count: 0 };
+    function _sendCmd(cmd) {
+        try {
+            if (typeof SendCommand === 'function') { SendCommand(cmd); return; }
+            if (typeof unsafeWindow !== 'undefined' && unsafeWindow && typeof unsafeWindow.SendCommand === 'function') { unsafeWindow.SendCommand(cmd); return; }
+            if (window.GameState && typeof window.GameState.send === 'function') { window.GameState.send(cmd); }
+        } catch (e) { }
+    }
+    function _jhPanelEmpty() {
+        try {
+            var D = window.Dialog;
+            if (!D || !D.jh) return false;
+            var el = D.jh.element;
+            if (!el) return false;
+            var left = null;
+            if (typeof $ === 'function' && $(el).find) { var _fb = $(el).find('.fb-left'); left = _fb && _fb.length ? _fb[0] : null; }
+            if (!left && el.querySelector) left = el.querySelector('.fb-left');
+            if (!left) return true;   // 面板开着但连左侧列表容器都没有 → 视为空
+            var count = left.querySelectorAll ? left.querySelectorAll('.fb-item, .fam-item').length : (left.children ? left.children.length : 0);
+            return count === 0;
+        } catch (e) { return false; }
+    }
+    function _jhTryHeal() {
+        try {
+            var D = window.Dialog;
+            if (!D || !D.jh) return;
+            var now = Date.now();
+            if (now - _jhHealState.lastTry < 6000) return;   // 防抖：6 秒内只自愈一次
+            if (_jhHealState.count >= 3) return;             // 每轮最多重试 3 次，避免无限刷
+            _jhHealState.lastTry = now;
+            _jhHealState.count++;
+            _sendCmd('jh');
+        } catch (e) { }
+    }
+    function _jhCheckHeal(delay) {
+        setTimeout(function () {
+            try {
+                var D = window.Dialog;
+                if (!D || !D.jh || !D.jh.isShow) return;      // 面板没开就不折腾
+                if (!_jhPanelEmpty()) { _jhHealState.count = 0; return; }   // 内容有了 → 自愈成功
+                _jhTryHeal();
+            } catch (e) { }
+        }, delay);
     }
 
     // 新客户端在登录时会重新暴露部分全局，登录后再补一次补丁（防被覆盖）

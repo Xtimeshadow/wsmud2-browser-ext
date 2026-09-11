@@ -181,12 +181,27 @@ TaskHelper.usezml = async function (idx = 0, n, cmds) {
 // 使用扩展脚本
 TaskHelper.usetz = async function (idx = 0, n, cmds) {
     cmds = TaskHelper.recmd(idx, cmds);
-    let tz = GM_getValue("extends");
+    let tz = GM_getValue("extends", []);
     for (var tzitem of tz) {
         if (tzitem.name == n) {
             await WG.sleep(100);
             let cmd = tzitem.content;
-            SCRIPT.run(cmd);
+            // 【2026-09-07 新客户端适配】新客户端（new.html）排除加载 extension-manager.js，
+            // 页面全局没有 SCRIPT（新客户端的引擎是模块私有）→ 直接按普通命令降级发送
+            if (typeof SCRIPT !== 'undefined' && typeof SCRIPT.run === 'function') {
+                await SCRIPT.run(cmd);
+            } else if (cmd && cmd[0] !== '#') {
+                if (typeof f2SendCommand === 'function') f2SendCommand(cmd);
+                else if (typeof SendCommand === 'function') SendCommand(cmd);
+                else if (window.GameState && typeof window.GameState.send === 'function') window.GameState.send(cmd);
+                else if (typeof WG !== 'undefined' && typeof WG.SendCmd === 'function') WG.SendCmd(cmd);
+                else messageAppend("扩展脚本发送失败：" + cmd, 1);
+            } else {
+                messageAppend("当前客户端不支持扩展模板命令（#开头）：" + cmd, 1);
+            }
+            WG.SendCmd(cmds);
+            return;
         }
     }
+    messageAppend("未找到扩展脚本：" + n, 1);
 };
