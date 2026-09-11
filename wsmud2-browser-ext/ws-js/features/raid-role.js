@@ -101,8 +101,6 @@
         },
         items: {}, // {id: object}
         stores: {}, // {id: object}
-        itemDescs: {}, // 【2026-08-09 移植v1.0.0】装备描述缓存 {id: {name, desc, attrs:[{name,value}]}}，供 (:eqHas) 词条判断
-        _pendingEqFetch: null, // 词条拉取等待标记（fetch 用）
         _weaponType: '',
         skills: {},
         profitInfo: null,
@@ -420,34 +418,6 @@
             WG.add_hook("dialog", function (data) {
                 if (data.dialog == null) return;
                 if (data.dialog == "pack") {
-                    // 【2026-08-09 移植v1.0.0】checkobj 返回的装备描述 → 解析词条存 itemDescs，供 (:eqHas) 使用
-                    if (data.from == "item" || data.from == "eq") {
-                        if (data.id != null && data.desc != null) {
-                            if (Role._pendingEqFetch === data.id) {
-                                Role._pendingEqFetch = "done";
-                            }
-                            var descText = data.desc.replace(/<[^>]+>/g, "");
-                            var itemName = descText.split("\n")[0].trim();
-                            var attrs = [];
-                            var lines = descText.split("\n");
-                            for (var li = 0; li < lines.length; li++) {
-                                var line = lines[li].trim();
-                                if (!line) continue;
-                                var m = line.match(/^(.+?)\s*[+×\-]\s*(.+)$/);
-                                if (m) {
-                                    var sign = line.match(/[+×\-]/);
-                                    var val = m[2].trim();
-                                    if (sign && sign[0] == "-") val = "-" + val;
-                                    attrs.push({ name: m[1].trim(), value: val });
-                                }
-                            }
-                            Role.itemDescs[data.id] = { name: itemName, desc: descText, attrs: attrs, rawDesc: data.desc };
-                            var _ids = Object.keys(Role.itemDescs);
-                            if (_ids.length > 200) {
-                                for (var _i = 0; _i < _ids.length - 200; _i++) delete Role.itemDescs[_ids[_i]];
-                            }
-                        }
-                    }
                     if (data.items != null) {
                         Role.items = {};
                         data = WG.smartClone(data);
@@ -1221,64 +1191,6 @@
                 if (item != null) return item.name.replace(/<.+?>|&lt.*/g, '').split(' ').pop();
                 //if (item != null) return item.name.replace(/<.+?>|&lt.*/g, '').match(/(\p{Script=Han}\s)*(\p{Script=Han}*)/u)[2]
                 //if (item != null) return item.name.match(/(\p{Script=Han}\s)*(\p{Script=Han}*)/u)[2];
-                return null;
-            },
-            ":eqHas ": function (param) {
-                // 【2026-08-09 移植v1.0.0】判断装备是否有指定词条。用法：(:eqHas 装备ID,词条名)
-                // 词条名支持"攻击"、"攻击%"（区分是否百分比词条），名称尾部冒号自动忽略
-                var parts = param.split(",");
-                if (parts.length <= 1) return false;
-                var id = (parts || ["", "", "", ""])[0].trim();
-                var q = (parts || ["", "", "", ""])[1].trim().replace(/：$/, "");
-                var queryPct = q.charAt(q.length - 1) === "%";
-                var qBase = queryPct ? q.slice(0, -1) : q;
-                var desc = Role.itemDescs[id];
-                if (desc == null || !desc.attrs) return false;
-                for (var i = 0; i < desc.attrs.length; i++) {
-                    var a = desc.attrs[i];
-                    if (!a || !a.name) continue;
-                    if (a.name.indexOf("◆") >= 0) continue;
-                    var name = a.name.replace(/：$/, "");
-                    var v = a.value == null ? "" : String(a.value);
-                    var attrPct = v.indexOf("%") >= 0;
-                    var aBase = name.replace(/%$/, "");
-                    if (aBase === qBase && attrPct === queryPct) return true;
-                }
-                return false;
-            },
-            ":eqFind ": function (param) {
-                // 【2026-08-19 优化】按名字查找物品ID，排除非 grade5/6 的装备
-                if (param == null) return null;
-                var name = String(param).trim();
-                if (name == '') return null;
-                // ① 背包 - 只查 grade5/6
-                for (var key in Role.items) {
-                    var item = Role.items[key];
-                    if (item.grade == null || item.grade < 5) continue;
-                    var itemName = item.name.replace(/<[^>]+>/g, "").trim();
-                    if (itemName.indexOf(name) >= 0) {
-                        return key;
-                    }
-                }
-                // ② 身上装备 - 只查 grade5/6
-                if (Role.equipments && Role.equipments.eqs) {
-                    for (var i = 0; i < Role.equipments.eqs.length; i++) {
-                        var eq = Role.equipments.eqs[i];
-                        if (eq && eq.name) {
-                            if (eq.grade == null || eq.grade < 5) continue;
-                            var eqName = eq.name.replace(/<[^>]+>/g, "").trim();
-                            if (eqName.indexOf(name) >= 0) {
-                                return eq.id;
-                            }
-                        }
-                    }
-                }
-                // ③ 描述缓存（itemDescs，无 grade 信息，保留原始逻辑）
-                for (var descId in Role.itemDescs) {
-                    if (Role.itemDescs[descId].name.indexOf(name) >= 0) {
-                        return descId;
-                    }
-                }
                 return null;
             },
             ":eqOn ": function (param) {

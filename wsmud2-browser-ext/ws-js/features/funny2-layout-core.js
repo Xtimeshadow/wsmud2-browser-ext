@@ -47,14 +47,16 @@ window.__funny2_layout = window.__funny2_layout || {};
         })();
 
         function confirmWight() {
+            // 【2026-09-06 修复】游戏本体把 dialog-confirm append 到 body（包含块为 body），
+            // 三栏布局下用「视口宽-左右栏宽」估算 left/width 既不准确也易受 margin 干扰。
+            // 改为把 dialog-confirm 移到 .container 内：container 是 position:relative，
+            // 游戏原版 CSS（position:absolute; left:0; bottom:0; width:100%）即自动贴合 container。
             var d = document.querySelector('.dialog-confirm');
-            var l = document.querySelector('.left') || { offsetWidth: 0 };
-            var r = document.querySelector('.right') || { offsetWidth: 0 };
-            if (!d) return;
-            var total = l.offsetWidth + r.offsetWidth;
-            d.style.width = (window.innerWidth - total) + 'px';
-            d.style.left = l.offsetWidth + 'px';
-            d.style.right = r.offsetWidth + 'px';
+            var c = document.querySelector('.container');
+            if (!d || !c) return;
+            if (!c.contains(d)) {
+                c.appendChild(d);
+            }
         }
 
         (function moveAndStyleToolbar() {
@@ -85,6 +87,18 @@ window.__funny2_layout = window.__funny2_layout || {};
 
         confirmWight();
         window.addEventListener('resize', function () { confirmWight(); });
+        // 【2026-09-06 兜底】dialog-confirm 是游戏登录时 Confirm.Init() 才创建，扩展注入时可能尚不存在；
+        // 监视 body 变化，一旦出现即移入 .container
+        if (!confirmWight()) {
+            var _cfObserver = new MutationObserver(function () {
+                if (confirmWight() && _cfObserver) {
+                    _cfObserver.disconnect();
+                    _cfObserver = null;
+                }
+            });
+            _cfObserver.observe(document.body, { childList: true, subtree: true });
+            window.__cfObserver__ = _cfObserver;
+        }
     };
 
     // ========== 右侧栏（RIGHT） ==========

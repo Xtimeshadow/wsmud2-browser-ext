@@ -72,10 +72,18 @@ const SCRIPT = {
     },
     'actions': {
         'def': function(_t1184, _t1185) {
-            if (_t1184.length)
-                SendCommand(_t1185 + '\x20' + _t1184.join('\x20'));
-            else
-                SendCommand(_t1185);
+            let _t1186 = _t1184.length ? _t1185 + '\x20' + _t1184.join('\x20') : _t1185;
+            // 【2026-09-07 新客户端适配】裸 SendCommand 在新客户端（dist_new）可能不存在，
+            // 按 f2SendCommand → SendCommand → GameState.send → WG.SendCmd 顺序降级发送
+            try {
+                if (typeof f2SendCommand === 'function') f2SendCommand(_t1186);
+                else if (typeof SendCommand === 'function') SendCommand(_t1186);
+                else if (window.GameState && typeof window.GameState.send === 'function') window.GameState.send(_t1186);
+                else if (typeof WG !== 'undefined' && typeof WG.SendCmd === 'function') WG.SendCmd(_t1186);
+                else console.warn('[SCRIPT] 无可用命令发送通道，已丢弃：', _t1186);
+            } catch (_t1187) {
+                console.warn('[SCRIPT] 动作发送失败：', _t1186, _t1187);
+            }
         },
         'wait': function(_t1187) {
             return Util.Sleep(parseInt(_t1187[0]));

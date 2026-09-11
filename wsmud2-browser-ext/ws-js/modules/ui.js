@@ -140,6 +140,7 @@ var UI = {
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;" :title="item.zmlRun">{{item.name}}</span>
         <span class="zml-btn zml-btn-run" @click="runZml(item)">运行</span>
         <span class="zml-btn zml-btn-edit" @click="editZml(item)">编辑</span>
+        <span class="zml-btn zml-btn-action" @click="shareZml(item)">分享</span>
         <span :class="zmlShowBtnCls(item)" @click="toggleZmlShow(item)">{{zmlShowBtn(item)}}</span>
         <div class="zml-move-wrap">
           <span class="zml-btn zml-btn-move" :style="idx===0?{display:'none'}:{}" @click="moveZml(idx,-1)">上移</span>
@@ -181,6 +182,7 @@ var UI = {
     </div>
     <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
       <span class="zml-btn zml-btn-edit" @click="getShareZml">查询分享</span>
+      <span class="zml-btn zml-btn-action" @click="shareZml(editForm)">分享</span>
       <span class="zml-btn zml-btn-run" @click="saveZml">保存</span>
       <span class="zml-btn" style="border-color:#f88;color:#f88;" @click="deleteZml">删除</span>
     </div>
@@ -197,6 +199,7 @@ var UI = {
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ddd;font-size:12px;" :title="item.script">{{item.name}}</span>
         <span :class="'zml-btn ' + (item.isactive?'zml-btn-quick':'zml-btn-quick-off')" @click="toggleZtjk(item)">{{item.isactive?'启用':'暂停'}}</span>
         <span class="zml-btn zml-btn-edit" @click="editZtjk(item)">编辑</span>
+        <span class="zml-btn zml-btn-action" @click="shareZtjk(item)">分享</span>
         <div class="zml-move-wrap">
           <span class="zml-btn zml-btn-move" :style="idx===0?{display:'none'}:{}" @click="moveZtjk(idx,-1)">上移</span>
           <span class="zml-btn zml-btn-move" :style="idx===ztjkdata.length-1?{display:'none'}:{}" @click="moveZtjk(idx,1)">下移</span>
@@ -227,6 +230,7 @@ var UI = {
     </div>
     <div class="item-commands" style="display:flex;gap:10px;padding:6px 0;border-top:1px solid #555;">
       <span class="zml-btn zml-btn-edit" @click="getShareZtjk">查询分享</span>
+      <span class="zml-btn zml-btn-action" @click="shareZtjk(editZtjkForm)">分享</span>
       <span class="zml-btn zml-btn-run" @click="saveZtjk">保存</span>
       <span class="zml-btn" style="border-color:#f88;color:#f88;" @click="deleteZtjk">删除</span>
     </div>
