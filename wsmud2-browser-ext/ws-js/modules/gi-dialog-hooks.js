@@ -112,6 +112,8 @@ Object.assign(GlobalInit, {
                     _sendcmd = _sendcmd + "buy " + val + " " + key + " from " + _seller + ";";
                     _sendcmd = _sendcmd + "$wait 500;";
                 });
+                // 购买结束后刷新当铺库存
+                _sendcmd = _sendcmd + "$wait 500;refresh {r唐楠};";
                 WG.SendCmd(_sendcmd);
             }
         } else if (data.dialog == "score") {

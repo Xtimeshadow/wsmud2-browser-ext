@@ -316,9 +316,9 @@
     $(document).ready(function () {
         GM_addStyle('.content-bottom { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }');
         GM_addStyle([
-            '.span-btn { border: gray solid 1px; border-radius: 3px; display: inline-block; padding: 5px; font-size: 15px; margin: 0 5px 5px 0; }',
-            '.span-btn { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; cursor: pointer; }',
-            '.span-btn:hover { color: #ffffff; }',
+            '.span-btn { border: 1px solid var(--ws-border-hover); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; font-size: 13px; margin: 0 4px 4px 0; background: var(--ws-card); color: var(--ws-text); line-height: 1.6; cursor: pointer; box-sizing: border-box; transition: all .15s ease; }',
+            '.span-btn { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; cursor: pointer; }',
+            '.span-btn:hover { background: var(--ws-card-hover); }',
             '.span-btn:active { transform: translateY(1px); }',
         ].join('\n'));
         GM_addStyle([

@@ -10,7 +10,20 @@ window.__funny2_layout = window.__funny2_layout || {};
     layout.initUI = function () {
         var F = window.__funny2;
 
-        /********************FN********************/
+        /********************QUICK BTN 主题分组着色********************/
+        // 【2026-09-08 和谐化】左侧快捷按钮四行按语义配主题色，flex 等距排布
+        GM_addStyle([
+            '.left-hotkeys > div { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }',
+            '.left-hotkeys .span-btn { margin: 0; flex: 1 1 0; min-width: 0; padding: 3px 4px; font-size: 12px; justify-content: center; box-sizing: border-box; white-space: nowrap; background: transparent; border-color: var(--ws-border); }',
+            'hic.span-btn { color: var(--ws-cyan); }',
+            'hic.span-btn:hover { color: #fff; background: rgba(255,255,255,.07); border-color: var(--ws-border-hover); }',
+            'hig.span-btn { color: var(--ws-gold); }',
+            'hig.span-btn:hover { color: #fff; background: rgba(255,255,255,.07); border-color: var(--ws-border-hover); }',
+            'hiz.span-btn { color: var(--ws-success); }',
+            'hiz.span-btn:hover { color: #fff; background: rgba(255,255,255,.07); border-color: var(--ws-border-hover); }',
+            'hio.span-btn { color: var(--ws-danger); }',
+            'hio.span-btn:hover { color: #fff; background: rgba(255,255,255,.07); border-color: var(--ws-border-hover); }',
+        ].join('\n'));
         var hideLeftRight = function () {
             AddContent($("<div></div>").append(
                 $('<span class="span-btn"></span>').append("全部隐藏").click(function () { $(".left").hide(); $(".right").hide(); }),
@@ -25,6 +38,15 @@ window.__funny2_layout = window.__funny2_layout || {};
         };
         var clearRightMsg = function () {
             $(".content-message pre").html("");
+            // 【2026-09-07 清屏顺带清聊天记录】只清 DOM 不够：切频道时会从 datas 重放，需连按频道缓存一起清
+            try {
+                if (typeof Dialog !== 'undefined' && Dialog.channel && Array.isArray(Dialog.channel.datas)) {
+                    Dialog.channel.datas.length = 0;
+                }
+                if (typeof Process !== 'undefined' && Process.channel && typeof Process.channel.clear === 'function') {
+                    Process.channel.clear();
+                }
+            } catch (e) { }
         };
         var scpack = [
             "玄晶","红宝石", "绿宝石", "蓝宝石", "黄宝石",
@@ -153,6 +175,7 @@ window.__funny2_layout = window.__funny2_layout || {};
                 $('<hiz class="span-btn"></hiz>').append("门战").click(toSchoolMPZ),
                 $('<hiz class="span-btn"></hiz>').append("拍卖").click(function () { f2SendCommand('pm list'); }),
                 $('<hiz class="span-btn"></hiz>').append("练功").click(function () { f2SendCommand('stopstate;$to 住房-练功房'); }),
+                $('<hiz class="span-btn"></hiz>').append("花园").click(function () { f2SendCommand('stopstate;$to 住房-小花园'); }),
                 $('<hiz class="span-btn"></hiz>').append("塔顶").click(function () { f2SendCommand('stopstate;jh fam 9 start;go enter'); })
             ),
             $("<div></div>").append(
@@ -162,6 +185,12 @@ window.__funny2_layout = window.__funny2_layout || {};
                 $('<hio class="span-btn"></hio>').append("攻略").click(function () { window.open("https://ucn595zz2fou.feishu.cn/wiki/JvEZw8bEiiIpf3kQiFJcAwbanji", "_blank"); }),
                 $('<hio class="span-btn"></hio>').append("切换").click(toggleLeftRight),
                 $('<hio class="span-btn"></hio>').append("禁地").click(toSchoolJD),
+                $('<hio class="span-btn"></hio>').append("帮会").click(toSchoolBP),
+                // 【2026-09-07 重登】软重登：清日志 DOM + 断线自动续连（1秒内恢复，不刷新页面）
+                $('<hio class="span-btn"></hio>').append("重登").attr('id', 'btn_f2_relogin').click(function () {
+                    var fn = (typeof unsafeWindow !== 'undefined' && unsafeWindow.__extManualRelogin) || window.__extManualRelogin;
+                    if (fn) fn();
+                })
                 $('<hio class="span-btn"></hio>').append("帮会").click(toSchoolBP)
             ),
             $("<div></div>")

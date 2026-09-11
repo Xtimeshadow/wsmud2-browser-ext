@@ -51,6 +51,16 @@ function messageClear() {
     _msgQ['1'] = [];
     _msgQ['0'] = [];
 }
+// 【2026-09-07 软重登】清空右侧挂机主日志区（.WG_right_log pre），并重置行数计数与批量队列
+// 与 messageClear（清左侧）配套：重登不清页面时，清掉挂机日志 DOM 防止节点过多
+function messageClearRight() {
+    var pre = document.querySelector('.WG_right_log pre');
+    if (pre) pre.innerHTML = '';
+    log_log_line = 0;
+    _msgQ['0'] = [];
+    _msgQ['1'] = [];
+    _msgQ['2'] = [];
+}
 var log_line = 0;
 var log_log_line = 0;
 

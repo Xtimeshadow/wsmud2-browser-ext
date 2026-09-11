@@ -46,7 +46,9 @@
                 const flag = localStorage.getItem("ext_auto_recover_flag");
                 if (!flag) return;
                 localStorage.removeItem("ext_auto_recover_flag");
-                await this.waitForElementVisible("#wsmud-login-accounts", 8e3);
+                // 【2026-09-07 加速】主动触发一次"一键登录"弹窗注入，再等其就绪
+                try { if (this.injectAssistantButton) this.injectAssistantButton(); } catch (e) { }
+                try { await this.waitForElementVisible("#wsmud-login-accounts", 5e3); } catch (e) { }
                 if (!this.accountData || Object.keys(this.accountData).length === 0) {
                     this.updateStatus("未找到已保存的账号，无法自动重登，请手动登录");
                     try { if (typeof PushAlert === 'function') PushAlert('relogin_fail', '⚠️ 自动重登失败：未找到已保存的账号，请手动登录'); } catch (e) { }
@@ -72,6 +74,9 @@
                     }
                     localStorage.removeItem("ext_kick_recover_role");
                     if (targetAccount) {
+                        // 【2026-09-07 加速】刷新后稍等区服面板自动选中（游戏记忆上次区服），
+                        // 让 roles hook 恢复 currentAccount/currentServerName，命中"直接选角色"快速路径
+                        await this.waitForElementVisibleSoft(".server-list>.select", 4e3);
                         await this.loginToRole(targetAccount, targetServer, targetRole);
                         return;
                     }
@@ -305,5 +310,6 @@
     });
 
     // 延迟执行自动恢复登录（重连刷新后自动重登）
-    setTimeout(() => AccountHelper.autoRecoverLogin(), 1500);
+    // 【2026-09-07 加速】300ms 即开始尝试，弹窗未就绪时会自行等待
+    setTimeout(() => AccountHelper.autoRecoverLogin(), 300);
 })();

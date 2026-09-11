@@ -178,8 +178,29 @@ function clearAllBuffTimers() {
     const allStatusItems = document.querySelectorAll('.status-item');
     allStatusItems.forEach((el) => {
         const cd = el.querySelector('.buff-cd');
+
         if (cd) cd.remove();
     });
+}
+
+// 【2026-09-08】按物品清理 BUFF 倒计时：物品离开房间（itemremove）时调用，
+// 取消该物品挂起的防抖和已登记的计时器，避免物品消失后防抖回调查空 DOM
+// （旧实现只清 GameState 数据，残留计时器会空转并触发"找不到BUFF元素"告警）
+function clearBuffDisplayByItem(id) {
+    if (!id) return;
+    // 防抖：取消该物品所有挂起的延迟回调
+    for (const k in _buffDebounce) {
+        if (k.endsWith('-' + id)) {
+            clearTimeout(_buffDebounce[k]);
+            delete _buffDebounce[k];
+        }
+    }
+    // 计时器：移除该物品所有登记项（DOM 已随物品消失，无需还原浮层）
+    for (const key of buffTimers.keys()) {
+        if (key.endsWith('-' + id)) {
+            buffTimers.delete(key);
+        }
+    }
 }
 
 // 技能CD显示函数
@@ -233,7 +254,22 @@ function showBuffDuration(sid, duration, id, count = 0, overtime = 0) {
         // 延时100毫秒，等待元素刷新
         const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
 
-        if (elements.length === 0) {ExtLog.warn(`找不到BUFF元素: sid=${sid}, id=${id}`);return;}
+    const key = getBuffTimerKey(sid, id);
+
+    // 【2026-09-07 防抖】战斗中同一 BUFF 会被高频推送（items/status），100ms 内只保留
+    // 最后一次处理，避免反复"移除旧浮层→重渲染"造成的图标高频闪烁
+    if (_buffDebounce[key]) {
+        clearTimeout(_buffDebounce[key]);
+    }
+    _buffDebounce[key] = setTimeout(() => {
+        delete _buffDebounce[key];
+
+        // 延时100毫秒，等待元素刷新
+        const elements = document.querySelectorAll(`.room-item[itemid="${id}"] .status-item[sid="${sid}"]`);
+
+        // 【2026-09-08】"找不到"是预期竞态（BUFF 在 100ms 防抖内已过期/物品已离房），
+        // 静默返回即可，不再作为告警刷屏（清理逻辑见 clearBuffDisplayByItem）
+        if (elements.length === 0) { ExtLog.log(`BUFF元素已消失，跳过: sid=${sid}, id=${id}`); return; }
 
         clearBuffDisplay(sid, id);
 

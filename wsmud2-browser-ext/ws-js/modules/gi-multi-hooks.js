@@ -51,6 +51,9 @@ Object.assign(GlobalInit, {
                 }
                 break;
             case "items":
+                // 【2026-09-08】全量刷新=房间整体重绘，旧 BUFF 计时全部失效，先清干净，
+                // 再由下方循环对仍在场的物品重新登记（不清的话残留计时器会空转告警）
+                clearAllBuffTimers();
                 WG.saveRoomstate(data);
                 GameState.items = new Map();
                 for (var i = 0; i < data.items.length; i++) {
@@ -111,6 +114,9 @@ Object.assign(GlobalInit, {
                 break;
             case "itemremove":
                 GameState.items.delete(data.id);
+                // 【2026-09-08】物品离开房间，清理其挂起的 BUFF 防抖/计时器，
+                // 否则物品消失后防抖回调查空 DOM 触发"找不到BUFF元素"告警
+                clearBuffDisplayByItem(data.id);
                 break
             case "sc":
                 let xitem = GameState.items.get(data.id);

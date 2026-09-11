@@ -36,25 +36,18 @@ const TriggerUI = {
     triggerHome: function () {
         const content = `
         <div>
-            <div v-for="t in triggers">
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                <table style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">{{ t.name }}</td>
-                        <td style="width:40px;text-align:center;">
-                            <span style="display:inline-block;width:99px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="editTrigger(t)">设置</span>
-                        </td>
-                        <td style="width:54px;text-align:center;">
-                            <span v-if="t.active()" style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:#4caf50;color:#e8f5e9;font-size:12px;cursor:pointer;" v-on:click="switchStatus(t)">已开启</span>
-                            <span v-else style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(120,120,120,0.5);color:#dddddd;font-size:12px;cursor:pointer;" v-on:click="switchStatus(t)">已关闭</span>
-                        </td>
-                    </tr>
-                </table>
+            <div class="wsmd-list-row" v-for="t in triggers">
+                <span class="wsmd-list-name">{{ t.name }}</span>
+                <span class="wsmd-list-actions">
+                    <span class="wsmd-btn wsmd-btn-sm" v-on:click="editTrigger(t)">设置</span>
+                    <span v-if="t.active()" class="wsmd-btn wsmd-btn-success wsmd-btn-sm" v-on:click="switchStatus(t)">已开启</span>
+                    <span v-else class="wsmd-btn wsmd-btn-muted wsmd-btn-sm" v-on:click="switchStatus(t)">已关闭</span>
+                </span>
             </div>
-            <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="triggers.length"></div>
+            <div class="wsmd-empty" v-if="!triggers.length">还没有触发器，点右上角「新建」创建一个吧</div>
         </div>
         `;
-        const rightText = "<span v-on:click='createTrigger()'><wht>新建</wht></span>";
+        const rightText = "<span class='wsmd-btn wsmd-btn-primary wsmd-btn-sm' v-on:click='createTrigger()'>新建</span>";
         TriggerUI._appendHtml("🍟 <hio>触发器</hio>", content, rightText);
         if (_triggerVue) { _triggerVue.$destroy(); _triggerVue = null; }
         _triggerVue = new Vue({
@@ -78,9 +71,11 @@ const TriggerUI = {
     },
     selectTriggerTemplate: function () {
         const content = `
-        <span class="zdy-item" style="width:120px" v-for="t in templates" v-on:click="select(t)">{{ t.event }}</span>
+        <div class="wsmd-tpl-grid">
+            <span class="wsmd-tpl-card" v-for="t in templates" v-on:click="select(t)">{{ t.event }}</span>
+        </div>
         `;
-        const leftText = "<span v-on:click='back()'>< 返回</span>";
+        const leftText = "<span class='wsmd-btn wsmd-btn-ghost wsmd-btn-sm' v-on:click='back()'>< 返回</span>";
         TriggerUI._showModal("<wht>选择触发事件</wht>", content, null, leftText);
         if (_triggerVue) { _triggerVue.$destroy(); _triggerVue = null; }
         _triggerVue = new Vue({

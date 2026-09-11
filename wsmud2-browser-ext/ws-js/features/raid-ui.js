@@ -497,6 +497,8 @@ var ManagedPerformerCenter = {
 
 // 【2026-08-11 加固】Vue 单实例管理：ContentModel 弹窗每次创建前销毁旧实例，防累积泄漏
 let _raidVue = null;
+// 【2026-09-07】Wsmud.modalShell 返回句柄：供 _closeModal 移除 Esc 监听/overlay
+let _raidModalHandle = null;
 
 const RaidUI = {
     showToolbar: function () {
@@ -529,7 +531,7 @@ const RaidUI = {
                 <span class="raid-item customFlow" id="workflows-button"><hig>流程</hig></span>
                 <span class="raid-item moreRaid"><hic>副本</hic></span>
                 <span class="raid-item commandLine"><hir>命令</hir></span>
-                <span class="raid-item itemLog"><hig>获得物品</hig></span>
+                <span class="raid-item itemLog"><hig>得物</hig></span>
                 <span class="raid-item zmlztjk"><hir>自命令</hir></span>
             </div>
         </div>`
@@ -573,18 +575,13 @@ const RaidUI = {
         ];
         const content = `
         <div id="forum-list-app">
-            <div v-for="item in items">
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                <table style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">{{ item.name }}</td>
-                        <td style="width:80px;text-align:center;">
-                            <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="item.action()">运行</span>
-                        </td>
-                    </tr>
-                </table>
+            <div class="wsmd-list-row" v-for="item in items">
+                <span class="wsmd-list-name">{{ item.name }}</span>
+                <span class="wsmd-list-actions">
+                    <span class="wsmd-btn wsmd-btn-primary wsmd-btn-sm" v-on:click="item.action()">运行</span>
+                </span>
             </div>
-            <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="items.length"></div>
+            <div class="wsmd-empty" v-if="!items.length">暂无快捷扩展</div>
         </div>`;
         RaidUI._appendHtml("🐟 <hiy>快捷扩展</hiy>", content);
         new Vue({
@@ -655,18 +652,13 @@ const RaidUI = {
         ];
         const content = `
         <div id="shortcut-list-app">
-            <div v-for="item in items">
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                <table style="width:100%;border-collapse:collapse;">
-                    <tr>
-                        <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">{{ item.name }}</td>
-                        <td style="width:80px;text-align:center;">
-                            <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="item.action()">运行</span>
-                        </td>
-                    </tr>
-                </table>
+            <div class="wsmd-list-row" v-for="item in items">
+                <span class="wsmd-list-name">{{ item.name }}</span>
+                <span class="wsmd-list-actions">
+                    <span class="wsmd-btn wsmd-btn-primary wsmd-btn-sm" v-on:click="item.action()">运行</span>
+                </span>
             </div>
-            <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="items.length"></div>
+            <div class="wsmd-empty" v-if="!items.length">暂无插件功能</div>
         </div>`;
         RaidUI._appendHtml("🍯 <hiz>插件功能</hiz>", content);
         new Vue({
@@ -685,9 +677,9 @@ const RaidUI = {
         const content = `
         <textarea id="cmdline-input" class="settingbox hide" style="display:inline-block;height:8rem;width:calc(100% - 4em);font-size:0.8em;font-family:'JetBrains Mono',monospace;margin:0 2em">${lastrun}</textarea>
         <div class="item-commands" style="text-align:center">
-            <span class="cmdline-run" style="width:120px"><wht>运行</wht></span>
+            <span class="cmdline-run wsmd-btn wsmd-btn-primary wsmd-btn-sm" style="display:inline-block"><wht>运行</wht></span>
         </div>`;
-        RaidUI._appendHtml("<hir>命令</hir>", content);
+        RaidUI._appendHtml("⌨️ <hir>命令</hir>", content);
         var input = $("#cmdline-input");
         input.focusout(function () {
             GM_setValue("_lastrun", input.val());
@@ -716,7 +708,7 @@ const RaidUI = {
         }
         RaidUI._renderItemLog();
         RaidUI._itemLogTimer = setInterval(function () {
-            if ($('.WG_left_log pre').text().indexOf('获得物品') >= 0) {
+            if ($('.WG_left_log pre').text().indexOf('得物') >= 0) {
                 RaidUI._renderItemLog();
             } else {
                 clearInterval(RaidUI._itemLogTimer);
@@ -728,7 +720,7 @@ const RaidUI = {
         var items = raidItemData || {};
         var keys = Object.keys(items);
         if (keys.length === 0) {
-            RaidUI._appendHtml("<hig>获得物品</hig>", "<hiy>暂无物品记录</hiy>");
+            RaidUI._appendHtml("💎 <hig>得物</hig>", "<hiy>暂无物品记录</hiy>");
             return;
         }
         function colorizeName(name) {
@@ -740,23 +732,20 @@ const RaidUI = {
         for (var i = 0; i < keys.length; i++) {
             var item = items[keys[i]];
             rows += '<tr>' +
-                '<td style="padding:2px 8px;text-align:left">' + colorizeName(item.name) + '</td>' +
-                '<td style="padding:2px 8px;text-align:right"><hig>' + item.count + '</hig></td>' +
-                '<td style="padding:2px 8px;text-align:right">' + item.current + '</td>' +
-                '<td style="padding:2px 8px;text-align:left">' + item.unit + '</td>' +
+                '<td style="padding:3px 8px;text-align:left">' + colorizeName(item.name) + '</td>' +
+                '<td style="padding:3px 8px;text-align:right"><hig>' + item.count + '</hig></td>' +
+                '<td style="padding:3px 8px;text-align:right"><wht>' + item.current + '</wht>' + item.unit + '</td>' +
                 '</tr>';
         }
-        var content = '<div style="max-height:60vh;overflow-y:auto">' +
-            '<table style="width:100%;border-collapse:collapse;font-size:0.9em">' +
-            '<thead><tr style="border-bottom:1px solid #555">' +
-            '<th style="padding:4px 8px;text-align:left">物品名</th>' +
-            '<th style="padding:4px 8px;text-align:right">获得数量</th>' +
-            '<th style="padding:4px 8px;text-align:right">当前持有</th>' +
-            '<th style="padding:4px 8px;text-align:left">单位</th>' +
-            '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        var content = '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+            '<thead><tr style="border-bottom:1px solid var(--ws-border);color:var(--ws-text-dim)">' +
+            '<th style="padding:3px 8px;text-align:left;font-weight:500">物品名</th>' +
+            '<th style="padding:3px 8px;text-align:right;font-weight:500">获得数量</th>' +
+            '<th style="padding:3px 8px;text-align:right;font-weight:500">持有</th>' +
+            '</tr></thead><tbody>' + rows + '</tbody></table>' +
             '<div class="item-commands" style="text-align:center;margin-top:8px">' +
-            '<span class="getitem" style="width:80px">清空</span></div>';
-        RaidUI._appendHtml("<hig>获得物品</hig>", content);
+            '<span class="getitem wsmd-btn wsmd-btn-danger wsmd-btn-sm" style="display:inline-block">清空</span></div>';
+        RaidUI._appendHtml("💎 <hig>得物</hig>", content);
         $(".getitem").on("click", function () {
             for (var key in raidItemData) {
                 delete raidItemData[key];
@@ -784,9 +773,9 @@ const RaidUI = {
         //     <option value="nameDesc">名称降序</option>
         // </select>
         // `
-        const leftText = `<wht>运行中</wht>`;
+        const leftText = "<span class='wsmd-btn wsmd-btn-success wsmd-btn-sm'>运行中</span>";
         const rightText = `
-        <select style='width:80px' id="workflows-opts">
+        <select class='wsmd-select' style='width:110px;height:26px;' id="workflows-opts">
             <option value="none">选择操作</option>
             <option value="createFinder">新建文件夹</option>
             <option value="createFlow">新建流程</option>
@@ -819,8 +808,11 @@ const RaidUI = {
     },
     createFinder: function () {
         const content = `
-        <div style="margin: 0 2em 5px 2em;text-align:center;width:calc(100% - 4em)">
-            <label for="create-finder-name"> 名称:</label><input id ="create-finder-name" style='width:120px' type="text"  name="create-finder-name" value="">
+        <div class="wsmd-form">
+            <div class="wsmd-field">
+                <label class="wsmd-label" for="create-finder-name">名称</label>
+                <input id="create-finder-name" class="wsmd-input" style="flex:1;" type="text" value="">
+            </div>
         </div>`;
         const save = function () {
             const name = $("#create-finder-name").val();
@@ -832,12 +824,15 @@ const RaidUI = {
                 alert(result);
             }
         };
-        RaidUI._showModal("🥗 <hig>新建文件夹</hig>", content, "<wht>保存</wht>", save, RaidUI._backTitle, function () { RaidUI._closeModal(); RaidUI.workflowsHome(); });
+        RaidUI._showModal("🥗 <hig>新建文件夹</hig>", content, "<span class='wsmd-btn wsmd-btn-primary wsmd-btn-sm'>保存</span>", save, RaidUI._backTitle, function () { RaidUI._closeModal(); RaidUI.workflowsHome(); });
     },
     modifyFinder: function (finder) {
         const content = `
-        <div style="margin: 0 2em 5px 2em;text-align:center;width:calc(100% - 4em)">
-            <label for="modify-finder-name"> 名称:</label><input id ="modify-finder-name" style='width:120px' type="text"  name="modify-finder-name" value="">
+        <div class="wsmd-form">
+            <div class="wsmd-field">
+                <label class="wsmd-label" for="modify-finder-name">名称</label>
+                <input id="modify-finder-name" class="wsmd-input" style="flex:1;" type="text" value="">
+            </div>
         </div>`;
         const remove = function () {
             var verify = confirm("删除文件夹将删除其中的所有流程，确认删除吗？");
@@ -857,7 +852,7 @@ const RaidUI = {
             RaidUI._closeModal();
             RaidUI.workflowsHome();
         };
-        RaidUI._showModal("🥗 <hig>修改文件夹</hig>", content, "删除", remove, RaidUI._backSaveTitle, back);
+        RaidUI._showModal("🥗 <hig>修改文件夹</hig>", content, "<span class='wsmd-btn wsmd-btn-danger wsmd-btn-sm'>删除</span>", remove, RaidUI._backSaveTitle, back);
         $('#modify-finder-name').val(finder.name);
     },
     openFinder: function (finderName) {
@@ -876,11 +871,15 @@ const RaidUI = {
             finderOptions += `<option value="${fName}"${fName == finderName ? ' selected' : ''}>${fName}</option>`;
         });
         const content = `
-        <div style="margin: 0 2em 5px 2em;text-align:left;width:calc(100% - 4em)">
-            <label for="create-flow-name"> 名称:</label><input id ="create-flow-name" style='width:120px' type="text"  name="create-flow-name" value="">
-            <label for="create-flow-finder">存放至:</label><select id="create-flow-finder">${finderOptions}</select>
+        <div class="wsmd-form">
+            <div class="wsmd-field">
+                <label class="wsmd-label" for="create-flow-name">名称</label>
+                <input id="create-flow-name" class="wsmd-input" style="flex:1;" type="text" value="">
+                <label class="wsmd-label" for="create-flow-finder">存放至</label>
+                <select id="create-flow-finder" class="wsmd-select">${finderOptions}</select>
+            </div>
         </div>
-        <textarea class = "settingbox hide" spellcheck="false" style = "height:20rem;display:inline-block;font-size:14px;line-height:1.5;width:calc(100% - 4em);font-family:'JetBrains Mono',monospace;" id = "create-flow-source"></textarea>`;
+        <textarea class="settingbox wsmd-code" spellcheck="false" style="height:20rem;font-size:14px;line-height:1.5;width:100%;font-family:'JetBrains Mono',monospace;" id="create-flow-source"></textarea>`;
         // 【2026-08-12 终版：textarea 方案】语法高亮/行号已取消，最终 = textarea + Tab 缩进（黑底灰字 + spellcheck 关闭）
         const save = function () {
             const name = $("#create-flow-name").val();
@@ -894,7 +893,7 @@ const RaidUI = {
                 alert(result);
             }
         };
-        RaidUI._showModal("🥗 <hig>新建流程</hig>", content, "<wht>保存</wht>", save, RaidUI._backTitle, function () { RaidUI._closeModal(); RaidUI.workflowsHome(); });
+        RaidUI._showModal("🥗 <hig>新建流程</hig>", content, "<span class='wsmd-btn wsmd-btn-primary wsmd-btn-sm'>保存</span>", save, RaidUI._backTitle, function () { RaidUI._closeModal(); RaidUI.workflowsHome(); });
         try {
             var _cfTa = document.getElementById('create-flow-source');
             if (_cfTa) {
@@ -910,14 +909,20 @@ const RaidUI = {
             options += `<option value="${finderName}">${finderName}</option>`;
         });
         const content = `
-        <div style="margin: 0 2em 5px 2em;text-align:left;width:calc(100% - 4em)">
-            <label for="modify-flow-name"> 名称:</label><input id ="modify-flow-name" style='width:120px' type="text"  name="modify-flow-name" value="">
-            <label for="modify-flow-finder">移动至</label><select id="modify-flow-finder">
-                ${options}
-            </select>
+        <div class="wsmd-form">
+            <div class="wsmd-field">
+                <label class="wsmd-label" for="modify-flow-name">名称</label>
+                <input id="modify-flow-name" class="wsmd-input" style="flex:1;" type="text" value="">
+                <label class="wsmd-label" for="modify-flow-finder">移动至</label>
+                <select id="modify-flow-finder" class="wsmd-select">
+                    ${options}
+                </select>
+            </div>
         </div>
-        <textarea class = "settingbox hide" spellcheck="false" style = "height:20rem;display:inline-block;font-size:14px;line-height:1.5;width:calc(100% - 4em);font-family:'JetBrains Mono',monospace;" id = "modify-flow-source"></textarea>
-        <span class="raid-item shareFlow">分享此流程</span>`;
+        <div style="display:flex;justify-content:flex-end;">
+            <span class="wsmd-btn wsmd-btn-gold wsmd-btn-sm shareFlow">分享此流程</span>
+        </div>
+        <textarea class="settingbox wsmd-code" spellcheck="false" style="height:20rem;font-size:14px;line-height:1.5;width:100%;font-family:'JetBrains Mono',monospace;" id="modify-flow-source"></textarea>`;
         const remove = function () {
             var verify = confirm("确认删除此工作流程吗？");
             if (verify) {
@@ -939,7 +944,7 @@ const RaidUI = {
             RaidUI._closeModal();
             RaidUI.openFinder(finderName);
         };
-        RaidUI._showModal("🥗 <hig>修改流程</hig>", content, "删除", remove, RaidUI._backSaveTitle, back);
+        RaidUI._showModal("🥗 <hig>修改流程</hig>", content, "<span class='wsmd-btn wsmd-btn-danger wsmd-btn-sm'>删除</span>", remove, RaidUI._backSaveTitle, back);
         $("#modify-flow-name").val(flow.name);
         $("#modify-flow-finder").val(flow.finder);
         $("#modify-flow-source").val(FlowStore.get(flow.name) || "");
@@ -961,36 +966,32 @@ const RaidUI = {
     },
 
     _toolbarHidden: true,
-    _backTitle: "<wht>< 返回</wht>",
-    _backSaveTitle: "<wht>< 保存&返回</wht>",
+    _backTitle: "<span class='wsmd-btn wsmd-btn-ghost wsmd-btn-sm'>< 返回</span>",
+    _backSaveTitle: "<span class='wsmd-btn wsmd-btn-ghost wsmd-btn-sm'>< 保存&返回</span>",
 
     _appendHtml(title, content, rightText, rightAction, leftText, leftAction) {
-        const finalLeftText = leftText == null ? "" : leftText;
-        const finalRightText = rightText == null ? "" : rightText;
-        var html = `
-        <div class = "item-commands" style="text-align:center">
-            <div style="margin-top:0.5em">
-                <div style="width:6em;float:left;text-align:left;padding:0 0 0 2em;height:1.23em" id="wsmud_raid_left">${finalLeftText}</div>
-                <div style="width:calc(100% - 16em);float:left;text-align:center;height:1.23em">${title}</div>
-                <div style="width:6em;float:right;text-align:right;padding:0 2em 0 0;height:1.23em" id="wsmud_raid_right">${finalRightText}</div>
-            </div>
-            <br><br>
-            ${content}
-        </div>`;
+        // 【2026-09-07 全面重设计】列表页头改用统一外壳（wsmd-* 设计系统），
+        // 保留 wsmud_raid_left/right 原 id 供 jQuery 绑定。
+        const head = Wsmud.listShell({ title: title, left: leftText, right: rightText });
+        var html = '<div class="wsmd-list">' + head + content + '</div>';
         // 【2026-08-08 按用户选择：方案A】Raid 弹窗内容仍写回日志区 .WG_left_log pre（原版行为），
         // 只把 Raid 工具栏搬到左侧（见 4258 行附近）。如以后想把弹窗也移左侧，改这里即可。
         WMsg.clean();
         WMsg.append(html, 2);
-        $("#wsmud_raid_left").on('click', function () {
+        $("#wsmud_raid_left").off('click').on('click', function () {
             if (leftAction) leftAction();
         });
-        $("#wsmud_raid_right").on('click', function () {
+        $("#wsmud_raid_right").off('click').on('click', function () {
             if (rightAction) rightAction();
         });
     },
     _closeModal: function () {
         // 【2026-08-11 加固】关闭弹窗时销毁 Vue 实例（防累积泄漏）
         if (_raidVue) { _raidVue.$destroy(); _raidVue = null; }
+        if (_raidModalHandle) {
+            _raidModalHandle.close();
+            _raidModalHandle = null;
+        }
         var el = document.getElementById('raid-modal-overlay');
         if (el) el.remove();
     },
@@ -1002,31 +1003,17 @@ const RaidUI = {
     },
     _showModal: function (title, content, rightText, rightAction, leftText, leftAction) {
         RaidUI._closeModal();
-        var finalLeftText = leftText == null ? "" : leftText;
-        var finalRightText = rightText == null ? "" : rightText;
-        var overlay = document.createElement('div');
-        overlay.id = 'raid-modal-overlay';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
-        var modal = document.createElement('div');
-        // 【2026-08-26 统一弹窗风格】恢复26.4版本样式
-        modal.style.cssText = 'background:#1a1a2e;border:1px solid #555;border-radius:12px;padding:24px;width:80vw;height:75vh;max-width:95%;max-height:85vh;overflow:auto;position:relative;box-shadow:0 0 30px rgba(0,0,0,0.5);';
-        var html = `
-        <div class="item-commands" style="text-align:center">
-            <div style="margin-top:0.5em">
-                <div style="width:12em;float:left;text-align:left;padding:0 0 0 2em;height:1.23em" id="wsmud_modal_left">${finalLeftText}</div>
-                <div style="width:calc(100% - 18em);float:left;text-align:center;height:1.23em">${title}</div>
-                <div style="width:6em;float:right;text-align:right;padding:0 2em 0 0;height:1.23em" id="wsmud_modal_right">${finalRightText}</div>
-            </div>
-            <br><br>
-            ${content}
-        </div>`;
-        modal.insertAdjacentHTML('beforeend', html);
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-        var leftEl = document.getElementById('wsmud_modal_left');
-        if (leftEl && leftAction) leftEl.onclick = function () { leftAction(); };
-        var rightEl = document.getElementById('wsmud_modal_right');
-        if (rightEl && rightAction) rightEl.onclick = function () { rightAction(); };
+        // 【2026-09-07 全面重设计】复用 raid-tools.js 的共享弹窗外壳（wsmd-* 设计系统）
+        _raidModalHandle = Wsmud.modalShell({
+            overlayId: 'raid-modal-overlay',
+            title: title,
+            content: content,
+            left: leftText,
+            right: rightText,
+            onLeft: leftAction,
+            onRight: rightAction,
+            onClose: RaidUI._closeModal
+        });
     },
     _workflowContentModel: function (items) {
         if (_raidVue) { _raidVue.$destroy(); _raidVue = null; }
@@ -1034,24 +1021,17 @@ const RaidUI = {
             el: '#WorkflowsContentModel',
             template: `
             <div id="workflows-list-app">
-                <div v-for="item in items">
-                    <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">
-                                <span v-if="item.type=='finder'">📂 {{ item.name }}</span>
-                                <span v-else>▶️{{ item.name }}</span>
-                            </td>
-                            <td style="width:80px;text-align:center;">
-                                <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="run(item)">{{ item.type=='finder' ? '打开' : '运行' }}</span>
-                            </td>
-                            <td style="width:80px;text-align:center;">
-                                <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,0,0.15);cursor:pointer;font-size:12px;" v-on:click="edit(item)">设置</span>
-                            </td>
-                        </tr>
-                    </table>
+                <div class="wsmd-list-row" v-for="item in items">
+                    <span class="wsmd-list-name">
+                        <span v-if="item.type=='finder'">📂 {{ item.name }}</span>
+                        <span v-else>▶️ {{ item.name }}</span>
+                    </span>
+                    <span class="wsmd-list-actions">
+                        <span class="wsmd-btn wsmd-btn-primary wsmd-btn-sm" v-on:click="run(item)">{{ item.type=='finder' ? '打开' : '运行' }}</span>
+                        <span class="wsmd-btn wsmd-btn-sm" v-on:click="edit(item)">设置</span>
+                    </span>
                 </div>
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="items.length"></div>
+                <div class="wsmd-empty" v-if="!items.length">这里空空如也，右上角「选择操作」新建一个吧</div>
             </div>`,
             data: function () {
                 return { items: items };
@@ -1081,18 +1061,13 @@ const RaidUI = {
             el: '#DungeonsContentModel',
             template: `
             <div id="dungeons-list-app">
-                <div v-for="item in items">
-                    <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">{{ item.desc || item.name }}</td>
-                            <td style="width:80px;text-align:center;">
-                                <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="run(item)">运行</span>
-                            </td>
-                        </tr>
-                    </table>
+                <div class="wsmd-list-row" v-for="item in items">
+                    <span class="wsmd-list-name">{{ item.desc || item.name }}</span>
+                    <span class="wsmd-list-actions">
+                        <span class="wsmd-btn wsmd-btn-primary wsmd-btn-sm" v-on:click="run(item)">运行</span>
+                    </span>
                 </div>
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="items.length"></div>
+                <div class="wsmd-empty" v-if="!items.length">暂无自动副本</div>
             </div>`,
             data: function () {
                 return { items: Dungeons };
@@ -1111,21 +1086,14 @@ const RaidUI = {
             el: '#WorkflowsContentModel',
             template: `
             <div id="running-flows-list-app">
-                <div v-for="flow in items">
-                    <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;"></div>
-                    <table style="width:100%;border-collapse:collapse;">
-                        <tr>
-                            <td style="padding:3px 0 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;">{{ flow.name() }}</td>
-                            <td style="width:80px;text-align:center;">
-                                <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,255,255,0.18);cursor:pointer;font-size:12px;" v-on:click="toggle(flow)">{{ flow.pausing() ? '▶️恢复' : '⏸暂停' }}</span>
-                            </td>
-                            <td style="width:80px;text-align:center;">
-                                <span style="display:inline-block;width:66px;height:24px;line-height:24px;text-align:center;border-radius:12px;background-color:rgba(255,0,0,0.15);cursor:pointer;font-size:12px;" v-on:click="stop(flow)">⏹停止</span>
-                            </td>
-                        </tr>
-                    </table>
+                <div class="wsmd-list-row" v-for="flow in items">
+                    <span class="wsmd-list-name">{{ flow.name() }}</span>
+                    <span class="wsmd-list-actions">
+                        <span class="wsmd-btn wsmd-btn-sm" v-on:click="toggle(flow)">{{ flow.pausing() ? '▶️恢复' : '⏸暂停' }}</span>
+                        <span class="wsmd-btn wsmd-btn-danger wsmd-btn-sm" v-on:click="stop(flow)">⏹停止</span>
+                    </span>
                 </div>
-                <div style="height:1px;background-color:rgba(255,255,255,0.25);margin:0 -20px;" v-if="items.length"></div>
+                <div class="wsmd-empty" v-if="!items.length">当前没有运行中的流程</div>
             </div>`,
             data: function () {
                 return { items: ManagedPerformerCenter.getAll() };
