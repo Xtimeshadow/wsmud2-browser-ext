@@ -14,6 +14,48 @@ var _reloginTry = 0;
 var _reloginTimer = null;
 var _reloginDelay = [500, 2000, 5000, 10000, 30000, 60000];
 
+
+// ---- 刷新式重登：预存登录凭证，跳过 UI 直接续连 ----
+// 刷新前把 cookie（完整登录命令）+ 角色 ID + 区服地址 存到 localStorage，
+// 刷新后 websocket-proxy.js 自动恢复 → 替身 send() 直接用预存 cookie 替换游戏的 'u p' 登录命令，
+// 跳过 AccountHelper 的账号切换/选区服/选角色全套 UI 操作。
+var _RC_COOKIE = 'ext_rc_cookie';
+var _RC_ID     = 'ext_rc_id';
+var _RC_TS     = 'ext_rc_ts';
+var _RC_SERVER = 'ext_rc_server';
+var _RC_TTL    = 600000;
+
+function _saveReloginContext() {
+    try {
+        var _hadCookie = false, _hadId = false, _cookieSrc = '', _idSrc = '';
+        // --- cookie：多来源兜底 ---
+        var _cookie = null;
+        if (GameState && GameState.cookie) { _cookie = String(GameState.cookie); _cookieSrc = 'GameState.cookie'; }
+        if (!_cookie && typeof unsafeWindow !== 'undefined' && unsafeWindow.__extFirstLoginCmd) {
+            try {
+                var _f = unsafeWindow.__extFirstLoginCmd();
+                if (_f) { _cookie = String(_f); _cookieSrc = 'extFirstLoginCmd'; }
+            } catch(e) {}
+        }
+        if (_cookie) { localStorage.setItem(_RC_COOKIE, _cookie); _hadCookie = true; }
+
+        // --- id：多来源兜底 ---
+        var rid = '';
+        if (GameState && GameState.id) { rid = String(GameState.id); _idSrc = 'GameState.id'; }
+        else if (typeof roleid !== 'undefined' && roleid) { rid = String(roleid); _idSrc = 'roleid'; }
+        else { try { if (typeof Process !== 'undefined' && Process.player) { rid = String(Process.player); _idSrc = 'Process.player'; } } catch(e){} }
+        if (rid) { localStorage.setItem(_RC_ID, rid); _hadId = true; }
+
+        try {
+            if (typeof SelectedServer !== 'undefined' && SelectedServer && SelectedServer.ip) {
+                localStorage.setItem(_RC_SERVER, JSON.stringify({ ip: SelectedServer.ip, port: SelectedServer.port, ID: SelectedServer.ID }));
+            }
+        } catch(e) {}
+        localStorage.setItem(_RC_TS, String(Date.now()));
+        try { console.info('[重登-预存] cookie=', _hadCookie ? _cookieSrc+'('+_cookie.slice(0,20)+'...)' : 'NO', ' id=', _hadId ? _idSrc+'('+rid+')' : 'NO', ' → valid=', _hadCookie && _hadId); } catch(e) {}
+    } catch (e) { console.warn('[重登-预存] 异常:', e.message); }
+}
+
 // 自动恢复刷新标记
 var _recoverFlagKey = 'ext_auto_recover_flag';
 var _recoverTimeKey = 'ext_last_recover_ts';
@@ -30,6 +72,7 @@ function _autoRecoverReload() {
         localStorage.setItem(_recoverTimeKey, String(now));
         localStorage.setItem(_recoverCountKey, String(count + 1));
         localStorage.setItem(_recoverFlagKey, '1');
+        _saveReloginContext();
         try { ExtLog.warn('[恢复] 重连失败达上限，自动刷新页面重新登录'); } catch (e) { }
         location.reload();
     } catch (e) { }
@@ -56,6 +99,7 @@ function _forceRelogin(targetRoleId) {
         if (now - lastKick < 30000) return;
         localStorage.setItem(kcTime, String(now));
         localStorage.setItem(_recoverFlagKey, '1');
+        _saveReloginContext();
         try { ExtLog.warn('[恢复] 检测到账号被其他设备登录(顶号)，自动刷新重新登录抢回 ' + rid); } catch (e) { }
         location.reload();
     } catch (e) { }
@@ -75,73 +119,55 @@ unsafeWindow.__extRecordKickRole = function () {
     } catch (e) { }
 };
 
-// 【2026-09-07 附加清理】随软重登一并清理游戏各区域的累积 DOM/缓存，减少长期挂机的内存增长：
-//   ① 聊天频道：清 DOM 渲染（MessageQueue.clear）＋ 清按频道缓存数组（Dialog.channel.datas）
-//      —— 只清 DOM 不够：切频道时 footerChanged 会从 datas 重放，消息会"重新出现"
-//   ② 主消息流：同上清 DOM（战斗/物品/系统文本，事件驱动挂机不受影响）
-//   ③ 地图缓存（MAP.Buffer 纯 JS 内存，下次进图自动重新拉取）
-//   注意：.room_items 房间物品列表不清 —— 自动拾取点选依赖它，且游戏每次进房会重建，不会累积
-function _extCleanupSession() {
+// 【2026-09-12 软重登清理逻辑已移除】旧"软重登"（清 DOM + 断线续连）已改为刷新式重登，
+// 整页重载会自动清空所有 JS/DOM/缓存，故不再需要 _extCleanupSession / messageClearRight 清理。
+
+// 【2026-09-12 刷新式重登】直接刷新页面，刷新后 autoRecoverLogin 自动重登当前角色：
+//   ① 记录当前角色 → ② 设自动恢复标记 → ③ location.reload()
+unsafeWindow.__extManualRelogin = function () {
     try {
-        // ① 聊天频道：清按频道缓存 + 清当前渲染 DOM
-        if (typeof Dialog !== 'undefined' && Dialog.channel && Array.isArray(Dialog.channel.datas)) {
-            Dialog.channel.datas.length = 0;
+        var rid = (typeof roleid !== 'undefined' && roleid) ? String(roleid) : '';
+        if (!rid) {
+            try { if (typeof Process !== 'undefined' && Process.player) rid = String(Process.player); } catch (e) { }
         }
-        // ② 主消息流：优先用游戏自带清理（多分页 pre 一次清干净），失败再手动清文本兜底
-        var msgCleared = false;
-        if (typeof Process !== 'undefined' && Process.channel && typeof Process.channel.clear === 'function') {
-            Process.channel.clear();
-            msgCleared = true;
-        }
-        if (!msgCleared) {
-            var chBox = document.querySelector('.channel');
-            if (chBox) {
-                var chPres = chBox.querySelectorAll('pre');
-                for (var i = 0; i < chPres.length; i++) chPres[i].textContent = '';
-            }
-        }
-        // ③ 主消息流 content-message：同上
-        var cmCleared = false;
-        if (typeof Process !== 'undefined' && Process.message && typeof Process.message.clear === 'function') {
-            Process.message.clear();
-            cmCleared = true;
-        }
-        if (!cmCleared) {
-            var cmBox = document.querySelector('.content-message');
-            if (cmBox) {
-                var cmPres = cmBox.querySelectorAll('pre');
-                for (var j = 0; j < cmPres.length; j++) cmPres[j].textContent = '';
-            }
-        }
-        // ④ 地图缓存：释放 MAP.Buffer 纯 JS 内存，下次进图自动重新拉取
-        if (typeof MAP !== 'undefined' && MAP && MAP.Buffer) {
-            for (var k in MAP.Buffer) {
-                if (MAP.Buffer.hasOwnProperty(k)) delete MAP.Buffer[k];
-            }
+        if (rid) localStorage.setItem(_kickTargetKey, String(rid));
+        localStorage.setItem(_recoverFlagKey, '1');
+        _saveReloginContext();
+        try { ExtLog.warn('[重登] 手动刷新重登，正在重新登录...'); } catch (e) { }
+        location.reload();
+    } catch (e) { }
+};
+
+// 遮罩自愈
+function _overlaySelfHeal() {
+    try {
+        if (!GameState || !GameState.connected) return;
+        var loader = document.getElementById('loader');
+        if (!loader) return;
+        if (loader.style.display === 'none' || loader.style.opacity === '0') return;
+        var msgEl = document.getElementById('loader_msg');
+        var msg = msgEl ? (msgEl.textContent || '') : '';
+        if (/正在连接|连接服务|Connecting|connecting/.test(msg)) {
+            loader.style.display = 'none';
+            loader.style.opacity = '0';
+            try { ExtLog.warn('[自愈] 检测到残留连接遮罩，已自动关闭'); } catch (e) { }
         }
     } catch (e) { }
 }
 
-// 【2026-09-07 软重登】不刷新页面，1 秒内完成重登：
-//   ① 清空各区域累积 DOM/缓存（左右日志 + 聊天频道 + 主消息流 + 地图缓存）
-//   ② 断开 WebSocket → 游戏侧自动重建连接并续连当前角色（免重新登录）
-//   ③ 启动重连调度兜底（退避重试，失败则按 auto_recover 自动刷新重登）
-//   相比 location.reload()：不再丢失挂机任务状态/计时器/自命令流程
-unsafeWindow.__extManualRelogin = function () {
+// 登录面板残留自愈
+function _loginScreenGuard() {
     try {
-        // 1) 清理各区域累积 DOM/缓存，减少节点
-        try { if (typeof messageClear === 'function') messageClear(); } catch (e) { }
-        try { if (typeof messageClearRight === 'function') messageClearRight(); } catch (e) { }
-        try { _extCleanupSession(); } catch (e) { }
-        // 2) 断开当前连接，游戏侧收到断线后会自动重建并续连当前角色
-        try { if (typeof unsafeWindow.__extCloseWs === 'function') unsafeWindow.__extCloseWs(); } catch (e) { }
-        // 3) 等 onclose 处理完（约 400ms）再启动重连调度：退避重试 + 失败自动刷新兜底
-        _reloginTry = 0;
-        setTimeout(function () {
-            try { _scheduleRelogin(); } catch (e) { }
-        }, 400);
+        if (!GameState || !GameState.connected) return;
+        if (!Process || !Process.player) return;
+        var $lc = $(".login-content");
+        if (!$lc.length || !$lc.is(":visible")) return;
+        $lc.stop(true).hide();
+        $lc.children().stop(true).hide();
+        $(".container").stop(true).show();
+        try { ExtLog.warn('[自愈] 登录面板残留（非焦点动画被节流），已强制切换到游戏界面'); } catch (e) { }
     } catch (e) { }
-};
+}
 
 // 跨窗口在线心跳
 var _hbKey = 'ext_live_roles';
@@ -149,6 +175,8 @@ var _hbTimer = null;
 
 function _heartbeatWrite() {
     try {
+        _overlaySelfHeal();
+        _loginScreenGuard();
         var map = {};
         try { map = JSON.parse(localStorage.getItem(_hbKey) || '{}') || {}; } catch (e) { map = {}; }
         var now = Date.now();
