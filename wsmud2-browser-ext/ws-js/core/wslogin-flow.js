@@ -1,38 +1,17 @@
-// ============================================================
 // wslogin-flow.js —— 一键登录流程
-// ------------------------------------------------------------
-// 扩展 AccountHelper 的登录流程相关方法：
-//   自动恢复登录、选定区服/角色、完整登录流程等。
-// ============================================================
 (function () {
     "use strict";
-
     const AccountHelper = window.__AccountHelper;
     if (!AccountHelper) return;
-
     Object.assign(AccountHelper, {
-
-        // ---- 必要时返回到登录界面 ----
         ensureLoginScreen: async function () {
             this.updateStatus("需要切换账号，正在返回登录界面...");
             const start = Date.now();
             while (Date.now() - start < 12000) {
                 try {
-                    if ($("#login_panel").is(":visible")) {
-                        this.updateStatus("已在登录界面。");
-                        return true;
-                    }
-                    if ($("#role_panel").is(":visible")) {
-                        $('.panel_item[command="ToServerPanel"]').click();
-                        await this.sleep(400);
-                        continue;
-                    }
-                    if ($("#slist_panel").is(":visible")) {
-                        if (typeof unsafeWindow.CloseServer === "function") unsafeWindow.CloseServer();
-                        $('.panel_item[command="ReLogin"]').click();
-                        await this.sleep(400);
-                        continue;
-                    }
+                    if ($("#login_panel").is(":visible")) { this.updateStatus("已在登录界面。"); return true; }
+                    if ($("#role_panel").is(":visible")) { $('.panel_item[command="ToServerPanel"]').click(); await this.sleep(400); continue; }
+                    if ($("#slist_panel").is(":visible")) { if (typeof unsafeWindow.CloseServer === "function") unsafeWindow.CloseServer(); $('.panel_item[command="ReLogin"]').click(); await this.sleep(300); continue; }
                 } catch (e) { }
                 await this.sleep(300);
             }
@@ -40,13 +19,54 @@
             return false;
         },
 
-        // ---- 自动恢复登录（重连刷新后自动重登） ----
         autoRecoverLogin: async function () {
             try {
                 const flag = localStorage.getItem("ext_auto_recover_flag");
                 if (!flag) return;
                 localStorage.removeItem("ext_auto_recover_flag");
-                // 【2026-09-07 加速】主动触发一次"一键登录"弹窗注入，再等其就绪
+
+                // 【2026-09-12 超短续连路径】
+                try {
+                    var _rcC = localStorage.getItem('ext_rc_cookie');
+                    var _rcI = localStorage.getItem('ext_rc_id');
+                    var _rcT = localStorage.getItem('ext_rc_ts');
+                    var _rcTTL = 0; try { _rcTTL = (Date.now() - parseInt(_rcT, 10)); } catch(e) {}
+                    var _rcValid = _rcC && _rcI && _rcT && _rcTTL < 600000;
+                    console.info('[重登-超短路径] ext_rc_cookie=', !!_rcC, ' ext_rc_id=', !!_rcI, ' age=', _rcTTL+'ms', ' → valid=', _rcValid, ' → GameState.connected=', !!GameState.connected);
+                    if (_rcValid) {
+                        this.updateStatus('⏩ 预存凭证续连中，跳过 UI 流程...');
+                        localStorage.removeItem('ext_kick_recover_role');
+                        var _ok = false;
+                        for (var _wi = 0; _wi < 50; _wi++) {
+                            try {
+                                if (GameState && GameState.connected) { _ok = true; break; }
+                                var $slist = null; try { $slist = $("#slist_panel"); } catch(e) {}
+                                if ($slist && $slist.is(':visible')) {
+                                    var $selBtn = $('.panel_item[command="SelectServer"]');
+                                    if ($selBtn && $selBtn.length) { try { $selBtn.click(); } catch(e) {} }
+                                }
+                            } catch(e) {}
+                            await this.sleep(200);
+                        }
+                        if (_ok) {
+                            this.updateStatus('✅ 续连成功');
+                            localStorage.removeItem('ext_rc_cookie');
+                            localStorage.removeItem('ext_rc_id');
+                            localStorage.removeItem('ext_rc_ts');
+                            localStorage.removeItem('ext_rc_server');
+                            return;
+                        } else {
+                            this.updateStatus('⚠️ 预存凭证续连超时，回退到常规登录流程');
+                            localStorage.removeItem('ext_rc_cookie');
+                            localStorage.removeItem('ext_rc_id');
+                            localStorage.removeItem('ext_rc_ts');
+                            localStorage.removeItem('ext_rc_server');
+                        }
+                    } else {
+                        console.info('[重登-超短路径] _rcValid=false → 走老流程');
+                    }
+                } catch(e) { console.warn('[重登-超短路径] 异常，回退老流程:', e.message); }
+
                 try { if (this.injectAssistantButton) this.injectAssistantButton(); } catch (e) { }
                 try { await this.waitForElementVisible("#wsmud-login-accounts", 5e3); } catch (e) { }
                 if (!this.accountData || Object.keys(this.accountData).length === 0) {
@@ -74,8 +94,6 @@
                     }
                     localStorage.removeItem("ext_kick_recover_role");
                     if (targetAccount) {
-                        // 【2026-09-07 加速】刷新后稍等区服面板自动选中（游戏记忆上次区服），
-                        // 让 roles hook 恢复 currentAccount/currentServerName，命中"直接选角色"快速路径
                         await this.waitForElementVisibleSoft(".server-list>.select", 4e3);
                         await this.loginToRole(targetAccount, targetServer, targetRole);
                         return;
@@ -111,7 +129,6 @@
             }
         },
 
-        // ---- 按账号/区服/角色ID 填充下拉并执行完整登录流程 ----
         loginToRole: async function (account, server, roleId) {
             try {
                 if (!account || !server || !roleId) return;
@@ -134,38 +151,26 @@
             }
         },
 
-        // ---- 轮询等待元素出现 ----
         waitForElement: function (selector, timeout) {
             return new Promise((resolve, reject) => {
                 const start = Date.now();
                 const iv = setInterval(() => {
-                    if ($(selector).length > 0) {
-                        clearInterval(iv);
-                        resolve(true);
-                    } else if (Date.now() - start > timeout) {
-                        clearInterval(iv);
-                        reject(`等待 ${selector} 超时`);
-                    }
+                    if ($(selector).length > 0) { clearInterval(iv); resolve(true); }
+                    else if (Date.now() - start > timeout) { clearInterval(iv); reject(`等待 ${selector} 超时`); }
                 }, 200);
             });
         },
 
-        // ---- 选择区服（按名字包含匹配） ----
         selectServerByName: async function (server) {
             if (!server) return false;
             const start = Date.now();
             while (Date.now() - start < 10000) {
                 try {
-                    const $li = $(".server-list li").filter(function () {
-                        return ($(this).text() || "").indexOf(server) >= 0;
-                    }).first();
+                    const $li = $(".server-list li").filter(function () { return ($(this).text() || "").indexOf(server) >= 0; }).first();
                     if ($li.length > 0) {
                         if (!$li.is(".select")) $li.click();
                         const selText = $(".server-list>.select").text() || "";
-                        if (selText.indexOf(server) >= 0) {
-                            this.updateStatus("区服已选中：" + server.trim());
-                            return true;
-                        }
+                        if (selText.indexOf(server) >= 0) { this.updateStatus("区服已选中：" + server.trim()); return true; }
                     }
                 } catch (e) { }
                 await this.sleep(300);
@@ -174,7 +179,6 @@
             return false;
         },
 
-        // ---- 选择角色（按 roleid 匹配） ----
         selectRoleById: async function (roleId) {
             if (!roleId) return false;
             const start = Date.now();
@@ -184,10 +188,7 @@
                     if ($role.length > 0) {
                         if (!$role.is(".select")) $role.click();
                         const selId = $(".role-list>.select").attr("roleid");
-                        if (String(selId) === String(roleId)) {
-                            this.updateStatus("角色已选中：" + $role.text().trim());
-                            return true;
-                        }
+                        if (String(selId) === String(roleId)) { this.updateStatus("角色已选中：" + $role.text().trim()); return true; }
                     }
                 } catch (e) { }
                 await this.sleep(300);
@@ -196,24 +197,17 @@
             return false;
         },
 
-        // ---- 自动登录主流程 ----
         handleAutoLogin: async function () {
             const account = $("#wsmud-login-accounts").val();
             const server = $("#wsmud-login-servers").val();
             const roleId = $("#wsmud-login-roles").val();
             if (!account || !server || !roleId) {
-                this.updateStatus("请选择完整的账号、区服和角色！", true);
-                return;
+                this.updateStatus("请选择完整的账号、区服和角色！", true); return;
             }
-
             $("#wsmud-login-overlay").addClass("hide");
             const $loginBtn = $("#wsmud-login-btn");
-            const resetBtn = () => $loginBtn.removeClass("loading")
-                .html('<span class="glyphicon glyphicon-flash"></span><span style="margin-left:0.5rem">立即登录</span>');
-            $loginBtn.addClass("loading")
-                .html('<span class="glyphicon glyphicon-spinner glyphicon-spin"></span><span style="margin-left:0.5rem">登录中...</span>');
-
-            // 当前账号和区服已选中，直接选择角色
+            const resetBtn = () => $loginBtn.removeClass("loading").html('<span class="glyphicon glyphicon-flash"></span><span style="margin-left:0.5rem">立即登录</span>');
+            $loginBtn.addClass("loading").html('<span class="glyphicon glyphicon-spinner glyphicon-spin"></span><span style="margin-left:0.5rem">登录中...</span>');
             if (this.currentAccount === account && this.currentServerName === server) {
                 try {
                     this.updateStatus("账号服务器匹配，直接登录角色...");
@@ -222,28 +216,13 @@
                     await this.sleep(300);
                     $('.panel_item[command="SelectRole"]').click();
                     this.updateStatus("登录指令已发送！");
-                } catch (error) {
-                    this.updateStatus(`错误: ${error}`, true);
-                } finally {
-                    resetBtn();
-                }
+                } catch (error) { this.updateStatus(`错误: ${error}`, true); } finally { resetBtn(); }
                 return;
             }
-
-            // 切换账号：需要重新走完整登录流程
             const encodedPassword = this.accountData[account].password;
-            if (!encodedPassword) {
-                this.updateStatus("未找到该账号的密码！", true);
-                resetBtn();
-                return;
-            }
+            if (!encodedPassword) { this.updateStatus("未找到该账号的密码！", true); resetBtn(); return; }
             const password = this.decryptPassword(encodedPassword);
-            if (password === null) {
-                this.updateStatus("密码解密失败，数据可能已损坏！", true);
-                resetBtn();
-                return;
-            }
-
+            if (password === null) { this.updateStatus("密码解密失败，数据可能已损坏！", true); resetBtn(); return; }
             try {
                 await this.ensureLoginScreen();
                 this.updateStatus("步骤1/3: 正在登录账号...");
@@ -252,64 +231,41 @@
                 $("#login_pwd").val(password);
                 $('.panel_item[command="LoginIn"]').click();
                 await this.waitForElementVisibleSoft("#slist_panel", 1e4);
-
                 this.updateStatus("步骤2/3: 正在选择区服...");
                 await this.selectServerByName(server);
                 $('.panel_item[command="SelectServer"]').click();
                 await this.waitForElementVisibleSoft("#role_panel", 1e4);
-
                 this.updateStatus("步骤3/3: 正在选择角色...");
                 await this.selectRoleById(roleId);
                 await this.sleep(300);
                 $('.panel_item[command="SelectRole"]').click();
                 this.updateStatus("登录指令已发送！");
-            } catch (error) {
-                this.updateStatus(`错误: ${error}`, true);
-            } finally {
-                resetBtn();
-            }
+            } catch (error) { this.updateStatus(`错误: ${error}`, true); } finally { resetBtn(); }
         },
 
-        // ---- 轮询等待元素可见（硬等待：超时 reject） ----
         waitForElementVisible: function (selector, timeout) {
             return new Promise((resolve, reject) => {
                 const startTime = Date.now();
                 const interval = setInterval(() => {
                     const $element = $(selector);
-                    if ($element.is(":visible")) {
-                        clearInterval(interval);
-                        resolve();
-                    } else if (Date.now() - startTime > timeout) {
-                        clearInterval(interval);
-                        reject(`操作超时: 等待 ${selector} 失败`);
-                    }
+                    if ($element.is(":visible")) { clearInterval(interval); resolve(); }
+                    else if (Date.now() - startTime > timeout) { clearInterval(interval); reject(`操作超时: 等待 ${selector} 失败`); }
                 }, 200);
             });
         },
 
-        // ---- 软等待：元素可见返回 true，超时不抛错返回 false ----
         waitForElementVisibleSoft: function (selector, timeout) {
             return new Promise((resolve) => {
                 const startTime = Date.now();
                 const interval = setInterval(() => {
                     try {
                         const $element = $(selector);
-                        if ($element.is(":visible")) {
-                            clearInterval(interval);
-                            resolve(true);
-                            return;
-                        }
+                        if ($element.is(":visible")) { clearInterval(interval); resolve(true); return; }
                     } catch (e) { }
-                    if (Date.now() - startTime > timeout) {
-                        clearInterval(interval);
-                        resolve(false);
-                    }
+                    if (Date.now() - startTime > timeout) { clearInterval(interval); resolve(false); }
                 }, 200);
             });
         }
     });
-
-    // 延迟执行自动恢复登录（重连刷新后自动重登）
-    // 【2026-09-07 加速】300ms 即开始尝试，弹窗未就绪时会自行等待
     setTimeout(() => AccountHelper.autoRecoverLogin(), 300);
 })();
