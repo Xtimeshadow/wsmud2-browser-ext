@@ -637,9 +637,10 @@
     })();
 
     (function () {
-        // 【2026-08-24 增强】@tidyBag：真正的一键整理包裹，固定顺序
-        //   stopstate → 自动使用 → 分解 → 清单售卖(autoSellList) → 卖光剩余 → 存仓
-        // 使用/分解/清单售卖均做"阻塞"（轮询物品用尽/角色空闲），确保上一步完成后再进入下一步。
+        // 【2026-09-10 调整顺序】@tidyBag：先使用→再售卖→最后分解（分解绝对最后）
+        //   stopstate → 自动使用 → 清单售卖(autoSellList) → 卖光剩余 → 存仓 → 分解
+        // 使用/售卖/分解均做"阻塞"（轮询物品用尽/角色空闲），确保上一步完成后再进入下一步。
+        // 注意：store all 在分解前执行，若它把待分解装备也存进仓库会导致分解失败，需实测确认。
         const executor = new AtCmdExecutor("tidyBag", function (performer, param) {
             // 分步进度提示（始终显示，不受 performer.log 开关限制）
             const step = function (m) { WMsg.cmdLog(m); };
@@ -651,17 +652,20 @@
                     // 1) 自动使用（阻塞）
                     WMsg.cmdLog("[1/4] 自动使用物品");
                     WG.tidyBlockUse(step).then(function () {
-                        // 2) 分解（阻塞）
-                        WMsg.cmdLog("[2/4] 分解装备");
-                        WG.tidyBlockFenjie(step).then(function () {
-                            // 3) 按 autoSellList 清单售卖（阻塞）
-                            WMsg.cmdLog("[3/4] 按清单售卖");
-                            WG.tidyBlockSell(step).then(function () {
-                                // 4) 卖光剩余 + 存仓
-                                WMsg.cmdLog("[4/4] 卖光剩余并存入仓库");
-                                WG.SendCmd("sell all;store all");
-                                setTimeout(function () { WMsg.cmdLog("整理包裹完成"); resolve(); }, 1000);
-                            });
+                        // 2) 按 autoSellList 清单售卖（阻塞）
+                        WMsg.cmdLog("[2/4] 按清单售卖");
+                        WG.tidyBlockSell(step).then(function () {
+                            // 3) 卖光剩余 + 存仓
+                            WMsg.cmdLog("[3/4] 卖光剩余并存入仓库");
+                            WG.SendCmd("sell all;store all");
+                            setTimeout(function () {
+                                // 4) 分解（阻塞，最后一步）
+                                WMsg.cmdLog("[4/4] 分解装备");
+                                WG.tidyBlockFenjie(step).then(function () {
+                                    WMsg.cmdLog("整理包裹完成");
+                                    resolve();
+                                });
+                            }, 800);
                         });
                     });
                 }, 500);
